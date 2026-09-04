@@ -134,8 +134,13 @@ terbash models -p groq     # list models of a specific provider
 terbash config path        # print config file path
 terbash config init        # create default config if missing
 terbash config set-provider groq   # set default + scaffold entry
+terbash config add-provider --name mycloud --base-url https://llm.example.com/v1 --model my-model --api-key sk-... --set-default
 terbash update             # self-update to latest release
 ```
+
+Any name works with `add-provider`: unknown names are treated as
+OpenAI-compatible custom endpoints (`--base-url` + `--model` required).
+Existing values (like `api_key`) are never overwritten.
 
 ### Interactive TUI
 ```bash
@@ -166,7 +171,10 @@ Commands:
 ### Switching provider
 
 Run `/providers` and a selectable list appears below the input —
-each row shows the provider, its model, and which one is active (`●`):
+**all** providers, not just configured ones. Each row shows the
+provider, its model, and a marker (`●` active, `○` ready, `+` setup needed).
+Picking a `+` provider scaffolds it (saved to config) and switches to it —
+then just set its API key (`GROQ_API_KEY`, …) or add `api_key` to the config:
 
 - `↑` / `↓` - Move selection
 - `Enter` - Switch to the highlighted provider

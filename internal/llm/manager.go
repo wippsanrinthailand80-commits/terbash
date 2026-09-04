@@ -72,8 +72,47 @@ func (m *Manager) createProvider(name types.Provider, cfg types.ProviderConfig) 
 	case types.ProviderOllama:
 		return providers.NewOllamaProvider(cfg), nil
 	default:
-		return nil, fmt.Errorf("unknown provider: %s", name)
+		// Any other name is treated as an OpenAI-compatible custom
+		// endpoint, as long as a base_url is configured.
+		if strings.TrimSpace(cfg.BaseURL) != "" {
+			return providers.NewCustomProvider(cfg), nil
+		}
+		return nil, fmt.Errorf("unknown provider: %s (add base_url + model via: terbash config add-provider --name %s --base-url https://... --model ...)", name, name)
 	}
+}
+
+// IsConfigured reports whether a provider is usable right now.
+func (m *Manager) IsConfigured(name string) bool {
+	_, ok := m.providers[types.Provider(strings.ToLower(strings.TrimSpace(name)))]
+	return ok
+}
+
+// EnsureProvider registers a provider that is not configured yet.
+// Built-ins get sensible defaults; anything else needs base_url + model
+// (see: terbash config add-provider).
+func (m *Manager) EnsureProvider(name string) error {
+	p := types.Provider(strings.ToLower(strings.TrimSpace(name)))
+	if p == "" {
+		return fmt.Errorf("provider name is required")
+	}
+	if _, ok := m.providers[p]; ok {
+		return nil
+	}
+	model, ok := types.DefaultModel(p)
+	if !ok {
+		return fmt.Errorf("provider %s needs manual setup first: terbash config add-provider --name %s --base-url https://... --model ...", p, p)
+	}
+	entry := types.ProviderConfig{Model: model, Temperature: 0.7, MaxTokens: 4096}
+	prov, err := m.createProvider(p, entry)
+	if err != nil {
+		return err
+	}
+	m.providers[p] = prov
+	if m.config.Providers == nil {
+		m.config.Providers = make(map[types.Provider]types.ProviderConfig)
+	}
+	m.config.Providers[p] = entry
+	return nil
 }
 
 func (m *Manager) GetProvider(name string) (types.LLMProvider, error) {
@@ -128,6 +167,24 @@ func (m *Manager) ListProviders() []string {
 	names := make([]string, 0, len(m.providers))
 	for name := range m.providers {
 		names = append(names, string(name))
+	}
+	sort.Strings(names)
+	return names
+}
+
+// AllProviderNames returns every selectable provider: all built-ins plus
+// any custom endpoints from config. Sorted.
+func (m *Manager) AllProviderNames() []string {
+	seen := make(map[types.Provider]bool)
+	for _, p := range types.SupportedProviders() {
+		seen[p] = true
+	}
+	for name := range m.providers {
+		seen[name] = true
+	}
+	names := make([]string, 0, len(seen))
+	for p := range seen {
+		names = append(names, string(p))
 	}
 	sort.Strings(names)
 	return names

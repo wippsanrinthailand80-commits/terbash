@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/terbash/terbash/internal/config"
 	"github.com/terbash/terbash/internal/llm"
 	"github.com/terbash/terbash/internal/tools"
 	"github.com/terbash/terbash/pkg/types"
@@ -358,10 +359,10 @@ func (a *App) handleCommand(input string) tea.Cmd {
 	return nil
 }
 
-// openProviderPicker shows the interactive provider list, preselecting
-// the currently active provider.
+// openProviderPicker shows every selectable provider (configured plus all
+// built-ins), preselecting the currently active one.
 func (a *App) openProviderPicker() {
-	names := a.llmManager.ListProviders()
+	names := a.llmManager.AllProviderNames()
 	a.providerIdx = 0
 	for i, n := range names {
 		if n == a.llmManager.DefaultProviderName() {
@@ -372,9 +373,25 @@ func (a *App) openProviderPicker() {
 	a.pickingProvider = true
 }
 
+// pickerModel returns the model shown for a picker row: the configured one,
+// the built-in default, or "-" when setup is needed.
+func (a *App) pickerModel(name string) string {
+	if a.llmManager.IsConfigured(name) {
+		if m := a.llmManager.ProviderModel(name); m != "" {
+			return m
+		}
+	}
+	if m, ok := types.DefaultModel(types.Provider(name)); ok {
+		return m
+	}
+	return "- (needs setup)"
+}
+
 // chooseProvider switches to the highlighted provider and closes the picker.
+// Picking a provider that is not configured yet scaffolds it (in memory and,
+// best-effort, in the config file) so it works right away.
 func (a *App) chooseProvider() {
-	names := a.llmManager.ListProviders()
+	names := a.llmManager.AllProviderNames()
 	a.pickingProvider = false
 	if len(names) == 0 {
 		return
@@ -383,15 +400,34 @@ func (a *App) chooseProvider() {
 		a.providerIdx = 0
 	}
 	name := names[a.providerIdx]
+	note := ""
+	if !a.llmManager.IsConfigured(name) {
+		model, _ := types.DefaultModel(types.Provider(name))
+		entry := types.ProviderConfig{Model: model, Temperature: 0.7, MaxTokens: 4096}
+		if err := a.llmManager.EnsureProvider(name); err != nil {
+			a.addSystemMessage(err.Error())
+			return
+		}
+		if path, err := config.GetConfigPath(); err == nil {
+			if err := config.EnsureProviderEntry(path, types.Provider(name), entry); err != nil {
+				note = " (session only - could not save to config)"
+			} else {
+				note = " (saved to config)"
+			}
+		}
+		if key := types.EnvKey(types.Provider(name)); key != "" {
+			note += fmt.Sprintf(" - set %s or add api_key", key)
+		}
+	}
 	if err := a.llmManager.SetDefaultProvider(name); err != nil {
 		a.addSystemMessage(err.Error())
 		return
 	}
 	model := a.llmManager.ProviderModel(name)
 	if model != "" {
-		a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)", name, model))
+		a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)%s", name, model, note))
 	} else {
-		a.addSystemMessage(fmt.Sprintf("Switched provider to %s", name))
+		a.addSystemMessage(fmt.Sprintf("Switched provider to %s%s", name, note))
 	}
 }
 
@@ -488,20 +524,21 @@ func (a *App) View() string {
 	b.WriteString(inputView)
 	b.WriteString("\n")
 
-	// Provider picker overlay: selectable list under the input box.
+	// Provider picker overlay: every selectable provider under the input.
 	if a.pickingProvider {
-		names := a.llmManager.ListProviders()
+		names := a.llmManager.AllProviderNames()
 		if a.providerIdx < 0 || (len(names) > 0 && a.providerIdx >= len(names)) {
 			a.providerIdx = 0
 		}
 		active := a.llmManager.DefaultProviderName()
 		for i, n := range names {
-			marker := "○"
+			marker := "+"
 			if n == active {
 				marker = "●"
+			} else if a.llmManager.IsConfigured(n) {
+				marker = "○"
 			}
-			model := a.llmManager.ProviderModel(n)
-			line := fmt.Sprintf("  %s  %s", n, model)
+			line := fmt.Sprintf("  %s  %s", n, a.pickerModel(n))
 			if n == active {
 				line += "  (active)"
 			}
@@ -512,7 +549,7 @@ func (a *App) View() string {
 			}
 			b.WriteString("\n")
 		}
-		b.WriteString(a.styles.Help.Render("↑↓: move • Enter: use provider • Esc: cancel"))
+		b.WriteString(a.styles.Help.Render("↑↓: move • Enter: use provider • Esc: cancel • ● active ○ ready + setup needed"))
 		return b.String()
 	}
 

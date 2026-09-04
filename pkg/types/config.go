@@ -33,6 +33,71 @@ type ProviderConfig struct {
 	MaxTokens   int     `mapstructure:"max_tokens" yaml:"max_tokens"`
 }
 
+// SupportedProviders lists every built-in provider name, sorted.
+func SupportedProviders() []Provider {
+	return []Provider{
+		ProviderAnthropic,
+		ProviderCohere,
+		ProviderCustom,
+		ProviderDeepSeek,
+		ProviderGemini,
+		ProviderGroq,
+		ProviderMistral,
+		ProviderOllama,
+		ProviderOpenAI,
+		ProviderPerplexity,
+		ProviderTogether,
+		ProviderXAI,
+	}
+}
+
+// IsSupported reports whether name is a built-in provider.
+func IsSupported(name Provider) bool {
+	for _, p := range SupportedProviders() {
+		if p == name {
+			return true
+		}
+	}
+	return false
+}
+
+// DefaultModel returns a sensible first-run model for a built-in provider.
+func DefaultModel(name Provider) (string, bool) {
+	models := map[Provider]string{
+		ProviderOpenAI:     "gpt-4o-mini",
+		ProviderGemini:     "gemini-1.5-flash",
+		ProviderAnthropic:  "claude-3-haiku-20240307",
+		ProviderGroq:       "llama-3.1-8b-instant",
+		ProviderMistral:    "mistral-large-latest",
+		ProviderCohere:     "command-r-plus",
+		ProviderTogether:   "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+		ProviderPerplexity: "llama-3.1-sonar-large-128k-online",
+		ProviderDeepSeek:   "deepseek-chat",
+		ProviderXAI:        "grok-beta",
+		ProviderOllama:     "llama3.2:3b",
+	}
+	m, ok := models[name]
+	return m, ok
+}
+
+// EnvKey returns the API-key environment variable for a provider, or "".
+func EnvKey(name Provider) string {
+	keys := map[Provider]string{
+		ProviderOpenAI:     "OPENAI_API_KEY",
+		ProviderGemini:     "GEMINI_API_KEY",
+		ProviderAnthropic:  "ANTHROPIC_API_KEY",
+		ProviderGroq:       "GROQ_API_KEY",
+		ProviderMistral:    "MISTRAL_API_KEY",
+		ProviderCohere:     "COHERE_API_KEY",
+		ProviderTogether:   "TOGETHER_API_KEY",
+		ProviderPerplexity: "PERPLEXITY_API_KEY",
+		ProviderDeepSeek:   "DEEPSEEK_API_KEY",
+		ProviderXAI:        "XAI_API_KEY",
+		ProviderCustom:     "CUSTOM_API_KEY",
+	}
+	return keys[name]
+}
+
 type ToolsConfig struct {
 	ConfirmWrites    bool  `mapstructure:"confirm_writes" yaml:"confirm_writes"`
 	ConfirmCommands  bool  `mapstructure:"confirm_commands" yaml:"confirm_commands"`

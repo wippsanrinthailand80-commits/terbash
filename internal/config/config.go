@@ -69,6 +69,35 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("godot.binary_path", "godot")
 }
 
+// EnsureProviderEntry adds a provider section to the config file, but only
+// fills in fields that are missing - existing values (especially api_key)
+// are never overwritten.
+func EnsureProviderEntry(path string, name types.Provider, entry types.ProviderConfig) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	v := viper.New()
+	v.SetConfigType("yaml")
+	v.SetConfigFile(path)
+	_ = v.ReadInConfig() // ignore missing file on fresh machines
+	prefix := "providers." + string(name) + "."
+	setIfMissing := func(key, value string) {
+		if value != "" && !v.IsSet(prefix+key) {
+			v.Set(prefix+key, value)
+		}
+	}
+	setIfMissing("api_key", entry.APIKey)
+	setIfMissing("base_url", entry.BaseURL)
+	setIfMissing("model", entry.Model)
+	if !v.IsSet(prefix+"temperature") && entry.Temperature != 0 {
+		v.Set(prefix+"temperature", entry.Temperature)
+	}
+	if !v.IsSet(prefix+"max_tokens") && entry.MaxTokens != 0 {
+		v.Set(prefix+"max_tokens", entry.MaxTokens)
+	}
+	return v.WriteConfigAs(path)
+}
+
 func Validate(c *types.Config) error {
 	if c.DefaultProvider == "" {
 		c.DefaultProvider = types.ProviderOllama
