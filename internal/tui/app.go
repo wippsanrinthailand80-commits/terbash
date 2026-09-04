@@ -161,8 +161,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Provider picker overlay takes over keys while open.
+	// Arrow keys do not exist on some mobile keyboards, so j/k,
+	// Ctrl+P/Ctrl+N and number keys work as alternatives.
 	if a.pickingProvider {
-		names := a.llmManager.ListProviders()
+		names := a.llmManager.AllProviderNames()
+		move := func(delta int) {
+			if len(names) > 0 {
+				a.providerIdx = (a.providerIdx + delta + len(names)) % len(names)
+			}
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			a.quitting = true
@@ -170,19 +177,32 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case tea.KeyEsc:
 			a.pickingProvider = false
 			return a, nil
-		case tea.KeyUp:
-			if len(names) > 0 {
-				a.providerIdx = (a.providerIdx - 1 + len(names)) % len(names)
-			}
+		case tea.KeyUp, tea.KeyCtrlP:
+			move(-1)
 			return a, nil
-		case tea.KeyDown:
-			if len(names) > 0 {
-				a.providerIdx = (a.providerIdx + 1) % len(names)
-			}
+		case tea.KeyDown, tea.KeyCtrlN:
+			move(1)
 			return a, nil
 		case tea.KeyEnter:
 			a.chooseProvider()
 			return a, nil
+		case tea.KeyRunes, tea.KeySpace:
+			if len(msg.Runes) == 1 {
+				switch r := msg.Runes[0]; {
+				case r == 'k':
+					move(-1)
+					return a, nil
+				case r == 'j':
+					move(1)
+					return a, nil
+				case r >= '1' && r <= '9':
+					if idx := int(r - '1'); idx < len(names) {
+						a.providerIdx = idx
+						a.chooseProvider()
+					}
+					return a, nil
+				}
+			}
 		}
 		// Any other key (typing, etc.) closes the picker and is
 		// handled normally below.
@@ -205,12 +225,12 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		a.quitting = true
 		return a, tea.Quit
-	case tea.KeyUp:
+	case tea.KeyUp, tea.KeyCtrlP:
 		if len(matches) > 0 {
 			a.paletteIdx = (a.paletteIdx - 1 + len(matches)) % len(matches)
 			return a, nil
 		}
-	case tea.KeyDown:
+	case tea.KeyDown, tea.KeyCtrlN:
 		if len(matches) > 0 {
 			a.paletteIdx = (a.paletteIdx + 1) % len(matches)
 			return a, nil
@@ -246,6 +266,19 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyRunes, tea.KeySpace:
 		if len(msg.Runes) > 0 {
+			// j/k navigate the "/" palette while still completing the
+			// command word (no arguments typed yet) - mobile keyboards
+			// often lack arrow keys.
+			if len(matches) > 0 && len(msg.Runes) == 1 && !strings.ContainsAny(a.input, " \t") {
+				switch msg.Runes[0] {
+				case 'k':
+					a.paletteIdx = (a.paletteIdx - 1 + len(matches)) % len(matches)
+					return a, nil
+				case 'j':
+					a.paletteIdx = (a.paletteIdx + 1) % len(matches)
+					return a, nil
+				}
+			}
 			a.input = a.input[:a.cursor] + string(msg.Runes) + a.input[a.cursor:]
 			a.cursor += len(msg.Runes)
 			a.paletteIdx = 0
@@ -549,7 +582,7 @@ func (a *App) View() string {
 			}
 			b.WriteString("\n")
 		}
-		b.WriteString(a.styles.Help.Render("↑↓: move • Enter: use provider • Esc: cancel • ● active ○ ready + setup needed"))
+		b.WriteString(a.styles.Help.Render("↑↓jk: move • 1-9/Enter: use • Esc: cancel • ● active ○ ready + setup needed"))
 		return b.String()
 	}
 
@@ -576,7 +609,7 @@ func (a *App) View() string {
 			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(matches)-maxShow)))
 			b.WriteString("\n")
 		}
-		b.WriteString(a.styles.Help.Render("↑↓: move • Tab/Enter: complete • Esc: close"))
+		b.WriteString(a.styles.Help.Render("↑↓jk: move • Tab/Enter: complete • Esc: close"))
 	} else {
 		b.WriteString(a.styles.Help.Render("Enter: send • Ctrl+C: quit • /: commands"))
 	}

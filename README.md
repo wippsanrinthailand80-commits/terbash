@@ -151,9 +151,13 @@ terbash update -y   # self-update to latest release
 Type `/` to open the command palette — matching commands appear
 below the input box, filtered as you type:
 
-- `↑` / `↓` - Move selection
+- `↑` / `↓` (or `k` / `j`, or `Ctrl+P` / `Ctrl+N`) - Move selection
 - `Tab` or `Enter` - Complete the selected command
 - `Esc` - Close the palette (`Ctrl+C` still quits)
+
+> On Termux the default keyboard has no arrow keys: use `j`/`k`, or
+> enable arrows via the Extra Keys row (`~/.termux/termux.properties`
+> → `extra-keys`, then `termux-reload-settings`).
 
 Commands:
 - `/help` - Show all commands
@@ -176,8 +180,8 @@ provider, its model, and a marker (`●` active, `○` ready, `+` setup needed).
 Picking a `+` provider scaffolds it (saved to config) and switches to it —
 then just set its API key (`GROQ_API_KEY`, …) or add `api_key` to the config:
 
-- `↑` / `↓` - Move selection
-- `Enter` - Switch to the highlighted provider
+- `↑` / `↓` (or `k` / `j`, or `Ctrl+P` / `Ctrl+N`) - Move selection
+- `Enter` or `1`–`9` - Switch to the highlighted provider
 - `Esc` - Cancel (typing anything else also closes the list)
 
 The switch applies instantly to the rest of your chat session.
