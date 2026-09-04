@@ -33,7 +33,14 @@ func Load(configFile string) (*types.Config, error) {
 	setDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		// Fresh installs have no config file yet - that is fine, use
+		// defaults + env vars. Viper returns different error types
+		// depending on whether SetConfigFile or AddConfigPath was used,
+		// so check for "not found" broadly (including paths with spaces).
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok &&
+			!os.IsNotExist(err) &&
+			!strings.Contains(strings.ToLower(err.Error()), "no such file") &&
+			!strings.Contains(strings.ToLower(err.Error()), "not found") {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}

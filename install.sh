@@ -3,9 +3,10 @@ set -euo pipefail
 
 REPO="wippsanrinthailand80-commits/terbash"
 BINARY_NAME="terbash"
-# $PREFIX is set on Termux, fall back to /usr/local/bin elsewhere
+# $PREFIX is set on Termux, fall back to /usr/local/bin elsewhere.
+# NOTE: all paths below are quoted so directories containing spaces work.
 INSTALL_DIR="${PREFIX:-/usr/local}/bin"
-CONFIG_DIR="$HOME/.config/terbash"
+CONFIG_DIR="${HOME}/.config/terbash"
 
 ARCH=$(uname -m)
 case $ARCH in
@@ -36,14 +37,14 @@ mkdir -p "$INSTALL_DIR"
 mkdir -p "$CONFIG_DIR"
 
 if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL "$LATEST_URL" -o "$INSTALL_DIR/$BINARY_NAME"; then
+    if ! curl -fsSL --proto '=https' -- "$LATEST_URL" -o "$INSTALL_DIR/$BINARY_NAME"; then
         echo "Error: download failed (404?)."
         echo "The release asset '$ASSET' was not found at $LATEST_URL"
         echo "Check https://github.com/$REPO/releases for available files."
         exit 1
     fi
 elif command -v wget >/dev/null 2>&1; then
-    if ! wget -q "$LATEST_URL" -O "$INSTALL_DIR/$BINARY_NAME"; then
+    if ! wget -q -- "$LATEST_URL" -O "$INSTALL_DIR/$BINARY_NAME"; then
         echo "Error: download failed. Check https://github.com/$REPO/releases"
         exit 1
     fi
@@ -52,7 +53,7 @@ else
     exit 1
 fi
 
-chmod +x "$INSTALL_DIR/$BINARY_NAME"
+chmod +x -- "$INSTALL_DIR/$BINARY_NAME"
 
 if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
     cat > "$CONFIG_DIR/config.yaml" << 'EOF'
@@ -84,3 +85,4 @@ echo "Config directory: $CONFIG_DIR"
 echo ""
 echo "Run '$BINARY_NAME' to start"
 echo "Run '$BINARY_NAME --help' for options"
+echo "Run '$BINARY_NAME update' to self-update to the latest release"

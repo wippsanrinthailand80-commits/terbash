@@ -38,6 +38,16 @@ make build-arm64  # or make build for current platform
 ./terbash
 ```
 
+### Update
+```bash
+terbash update            # download latest release and replace binary (asks first)
+terbash update -y         # update without confirmation
+terbash update --check    # only print the download URL, do not install
+terbash update --version v0.1.0   # install a specific release tag
+```
+
+> Paths containing spaces are supported by both `install.sh` and `terbash update`.
+
 ## Configuration
 
 Config file: `~/.config/terbash/config.yaml`
@@ -116,6 +126,7 @@ export XAI_API_KEY="..."
 ### Interactive TUI
 ```bash
 terbash
+terbash update -y   # self-update to latest release
 ```
 
 Commands:
