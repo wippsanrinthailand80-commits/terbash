@@ -14,6 +14,13 @@ type OpenAICompatibleProvider struct {
 	*BaseProvider
 }
 
+func baseURLOr(config types.ProviderConfig, def string) string {
+	if config.BaseURL != "" {
+		return config.BaseURL
+	}
+	return def
+}
+
 func NewOpenAICompatibleProvider(config types.ProviderConfig, baseURL string) *OpenAICompatibleProvider {
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
@@ -107,39 +114,79 @@ func (p *OpenAICompatibleProvider) GetConfig() types.ProviderConfig {
 }
 
 func NewOpenAIProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.openai.com/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.openai.com/v1"))
 }
 
 func NewGroqProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.groq.com/openai/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.groq.com/openai/v1"))
 }
 
 func NewMistralProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.mistral.ai/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.mistral.ai/v1"))
 }
 
 func NewCohereProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.cohere.ai/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.cohere.ai/v1"))
 }
 
 func NewTogetherProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.together.xyz/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.together.xyz/v1"))
 }
 
 func NewPerplexityProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.perplexity.ai")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.perplexity.ai"))
 }
 
 func NewDeepSeekProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.deepseek.com/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.deepseek.com/v1"))
 }
 
 func NewXAIProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(config, "https://api.x.ai/v1")
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.x.ai/v1"))
 }
 
 func NewCustomProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
 	return NewOpenAICompatibleProvider(config, config.BaseURL)
+}
+
+func NewOpenRouterProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://openrouter.ai/api/v1"))
+}
+
+func NewCerebrasProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.cerebras.ai/v1"))
+}
+
+func NewSambaNovaProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.sambanova.ai/v1"))
+}
+
+func NewFireworksProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.fireworks.ai/inference/v1"))
+}
+
+func NewDeepInfraProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.deepinfra.com/v1/openai"))
+}
+
+func NewMoonshotProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.moonshot.ai/v1"))
+}
+
+func NewNovitaProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.novita.ai/openai"))
+}
+
+func NewSiliconFlowProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://api.siliconflow.cn/v1"))
+}
+
+func NewZhipuProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://open.bigmodel.cn/api/paas/v4"))
+}
+
+func NewQwenProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProvider(config, baseURLOr(config, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"))
 }
 
 // NewLlamaCppProvider talks to a local llama.cpp server (llama-server),

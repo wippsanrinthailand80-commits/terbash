@@ -74,6 +74,26 @@ func (m *Manager) createProvider(name types.Provider, cfg types.ProviderConfig) 
 		return providers.NewOllamaProvider(cfg), nil
 	case types.ProviderLlamaCpp:
 		return providers.NewLlamaCppProvider(cfg), nil
+	case types.ProviderOpenRouter:
+		return providers.NewOpenRouterProvider(cfg), nil
+	case types.ProviderCerebras:
+		return providers.NewCerebrasProvider(cfg), nil
+	case types.ProviderSambaNova:
+		return providers.NewSambaNovaProvider(cfg), nil
+	case types.ProviderFireworks:
+		return providers.NewFireworksProvider(cfg), nil
+	case types.ProviderDeepInfra:
+		return providers.NewDeepInfraProvider(cfg), nil
+	case types.ProviderMoonshot:
+		return providers.NewMoonshotProvider(cfg), nil
+	case types.ProviderNovita:
+		return providers.NewNovitaProvider(cfg), nil
+	case types.ProviderSiliconFlow:
+		return providers.NewSiliconFlowProvider(cfg), nil
+	case types.ProviderZhipu:
+		return providers.NewZhipuProvider(cfg), nil
+	case types.ProviderQwen:
+		return providers.NewQwenProvider(cfg), nil
 	default:
 		// Any other name is treated as an OpenAI-compatible custom
 		// endpoint, as long as a base_url is configured.

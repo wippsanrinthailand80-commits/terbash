@@ -19,8 +19,11 @@ var rootCmd = &cobra.Command{
 	Use:   "terbash",
 	Short: "Terbash - Ultra-lightweight ARM64 AI Agent CLI",
 	Long: `A high-performance, ultra-lightweight AI agent CLI for ARM64 devices.
-Supports multiple LLM providers (OpenAI, Gemini, Anthropic, Groq, Mistral, Cohere, Together, Perplexity, DeepSeek, xAI, Ollama)
-with secure BYOK architecture and native tool calling.`,
+Supports 23 LLM providers with secure BYOK architecture and native tool
+calling: OpenAI, Gemini, Anthropic, Groq, Mistral, Cohere, Together,
+Perplexity, DeepSeek, xAI, Ollama, LlamaCpp, OpenRouter, Cerebras,
+SambaNova, Fireworks, DeepInfra, Moonshot, Novita, SiliconFlow, Zhipu,
+Qwen, plus any custom OpenAI-compatible endpoint.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		cfg, err = config.Load(cfgFile)

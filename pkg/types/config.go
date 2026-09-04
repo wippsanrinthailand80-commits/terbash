@@ -15,6 +15,16 @@ const (
 	ProviderXAI         Provider = "xai"
 	ProviderOllama      Provider = "ollama"
 	ProviderLlamaCpp    Provider = "llamacpp"
+	ProviderOpenRouter  Provider = "openrouter"
+	ProviderCerebras    Provider = "cerebras"
+	ProviderSambaNova   Provider = "sambanova"
+	ProviderFireworks   Provider = "fireworks"
+	ProviderDeepInfra   Provider = "deepinfra"
+	ProviderMoonshot    Provider = "moonshot"
+	ProviderNovita      Provider = "novita"
+	ProviderSiliconFlow Provider = "siliconflow"
+	ProviderZhipu       Provider = "zhipu"
+	ProviderQwen        Provider = "qwen"
 	ProviderCustom      Provider = "custom"
 )
 
@@ -38,18 +48,28 @@ type ProviderConfig struct {
 func SupportedProviders() []Provider {
 	return []Provider{
 		ProviderAnthropic,
+		ProviderCerebras,
 		ProviderCohere,
 		ProviderCustom,
+		ProviderDeepInfra,
 		ProviderDeepSeek,
+		ProviderFireworks,
 		ProviderGemini,
 		ProviderGroq,
 		ProviderLlamaCpp,
 		ProviderMistral,
+		ProviderMoonshot,
+		ProviderNovita,
 		ProviderOllama,
+		ProviderOpenRouter,
+		ProviderQwen,
+		ProviderSambaNova,
+		ProviderSiliconFlow,
 		ProviderOpenAI,
 		ProviderPerplexity,
 		ProviderTogether,
 		ProviderXAI,
+		ProviderZhipu,
 	}
 }
 
@@ -79,6 +99,16 @@ func DefaultModel(name Provider) (string, bool) {
 		ProviderOllama:     "llama3.2:3b",
 		// llama-server serves whatever GGUF is loaded and echoes this name.
 		ProviderLlamaCpp: "default",
+		ProviderOpenRouter:  "openai/gpt-4o-mini",
+		ProviderCerebras:    "llama3.1-8b",
+		ProviderSambaNova:   "Meta-Llama-3.3-70B-Instruct",
+		ProviderFireworks:   "accounts/fireworks/models/llama-v3p1-8b-instruct",
+		ProviderDeepInfra:   "meta-llama/Meta-Llama-3.1-8B-Instruct",
+		ProviderMoonshot:    "kimi-k3",
+		ProviderNovita:      "meta-llama/llama-3.1-8b-instruct",
+		ProviderSiliconFlow: "Qwen/Qwen3-8B",
+		ProviderZhipu:       "glm-4-flash",
+		ProviderQwen:        "qwen-plus",
 	}
 	m, ok := models[name]
 	return m, ok
@@ -101,6 +131,16 @@ func EnvKey(name Provider) string {
 		ProviderPerplexity: "PERPLEXITY_API_KEY",
 		ProviderDeepSeek:   "DEEPSEEK_API_KEY",
 		ProviderXAI:        "XAI_API_KEY",
+		ProviderOpenRouter: "OPENROUTER_API_KEY",
+		ProviderCerebras:   "CEREBRAS_API_KEY",
+		ProviderSambaNova:  "SAMBANOVA_API_KEY",
+		ProviderFireworks:  "FIREWORKS_API_KEY",
+		ProviderDeepInfra:  "DEEPINFRA_API_KEY",
+		ProviderMoonshot:   "MOONSHOT_API_KEY",
+		ProviderNovita:     "NOVITA_API_KEY",
+		ProviderSiliconFlow: "SILICONFLOW_API_KEY",
+		ProviderZhipu:      "ZAI_API_KEY",
+		ProviderQwen:       "DASHSCOPE_API_KEY",
 		ProviderCustom:     "CUSTOM_API_KEY",
 	}
 	return keys[name]

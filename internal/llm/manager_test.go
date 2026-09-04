@@ -191,3 +191,38 @@ func TestSetDefaultProvider(t *testing.T) {
 		t.Fatalf("failed switch must keep old default, got %s", m.DefaultProviderName())
 	}
 }
+
+func TestProviderCatalogComplete(t *testing.T) {
+	// Every built-in provider must be fully wired: constructible via the
+	// manager, with a default model (except custom) and an env key
+	// (except local providers).
+	local := map[types.Provider]bool{types.ProviderOllama: true, types.ProviderLlamaCpp: true}
+	for _, p := range types.SupportedProviders() {
+		m, err := NewManager(&types.Config{
+			DefaultProvider: types.ProviderOllama,
+			Providers:       map[types.Provider]types.ProviderConfig{},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p == types.ProviderCustom {
+			continue // custom needs base_url; covered by TestCustomEndpointByName
+		}
+		if err := m.EnsureProvider(string(p)); err != nil {
+			t.Errorf("EnsureProvider(%s): %v", p, err)
+			continue
+		}
+		if _, ok := types.DefaultModel(p); !ok {
+			t.Errorf("%s: missing default model", p)
+		}
+		if !local[p] && types.EnvKey(p) == "" {
+			t.Errorf("%s: missing env key", p)
+		}
+		if _, ok := m.providers[p]; !ok {
+			t.Errorf("%s: not registered after ensure", p)
+		}
+	}
+	if n := len(types.SupportedProviders()); n != 23 {
+		t.Fatalf("expected 23 supported providers, got %d", n)
+	}
+}

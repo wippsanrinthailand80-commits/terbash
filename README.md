@@ -5,7 +5,7 @@ Ultra-lightweight, native AI agent CLI for ARM64 devices (Android/Termux, macOS 
 ## Features
 
 - **Native Performance**: Single static Go binary, <30MB RAM, zero external dependencies
-- **Multi-Provider BYOK**: OpenAI, Google Gemini, Anthropic Claude, Groq, Ollama, Mistral, Cohere, Together AI, Perplexity, DeepSeek, xAI
+- **Multi-Provider BYOK**: 23 providers — OpenAI, Gemini, Anthropic, Groq, Mistral, Cohere, Together, Perplexity, DeepSeek, xAI, Ollama, LlamaCpp, OpenRouter, Cerebras, SambaNova, Fireworks, DeepInfra, Moonshot, Novita, SiliconFlow, Zhipu, Qwen + custom endpoints
 - **Secure Config**: API keys in `~/.config/terbash/config.yaml` with env var fallbacks
 - **Human-in-the-Loop Tools**: Read-Ask-Write confirmation for all file/state changes
 - **Sandboxed Execution**: Constrained to CWD, no directory traversal
@@ -108,6 +108,38 @@ providers:
   xai:
     api_key: "..."     # or XAI_API_KEY
     model: "grok-beta"
+  openrouter:
+    api_key: "..."     # or OPENROUTER_API_KEY
+    model: "openai/gpt-4o-mini"
+  cerebras:
+    api_key: "..."     # or CEREBRAS_API_KEY
+    model: "llama3.1-8b"
+  sambanova:
+    api_key: "..."     # or SAMBANOVA_API_KEY
+    model: "Meta-Llama-3.3-70B-Instruct"
+  fireworks:
+    api_key: "..."     # or FIREWORKS_API_KEY
+    model: "accounts/fireworks/models/llama-v3p1-8b-instruct"
+  deepinfra:
+    api_key: "..."     # or DEEPINFRA_API_KEY
+    model: "meta-llama/Meta-Llama-3.1-8B-Instruct"
+  moonshot:
+    api_key: "..."     # or MOONSHOT_API_KEY
+    model: "kimi-k3"
+  novita:
+    api_key: "..."     # or NOVITA_API_KEY
+    model: "meta-llama/llama-3.1-8b-instruct"
+  siliconflow:
+    api_key: "..."     # or SILICONFLOW_API_KEY
+    model: "Qwen/Qwen3-8B"
+  zhipu:
+    api_key: "..."     # or ZAI_API_KEY
+    model: "glm-4-flash"
+  qwen:
+    api_key: "..."     # or DASHSCOPE_API_KEY
+    model: "qwen-plus"
+    # base_url override per region, e.g. Beijing:
+    # base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   ollama:
     model: "llama3.2:3b"
     base_url: "http://localhost:11434"
@@ -154,7 +186,22 @@ export TOGETHER_API_KEY="..."
 export PERPLEXITY_API_KEY="..."
 export DEEPSEEK_API_KEY="..."
 export XAI_API_KEY="..."
+export OPENROUTER_API_KEY="..."
+export CEREBRAS_API_KEY="..."
+export SAMBANOVA_API_KEY="..."
+export FIREWORKS_API_KEY="..."
+export DEEPINFRA_API_KEY="..."
+export MOONSHOT_API_KEY="..."
+export NOVITA_API_KEY="..."
+export SILICONFLOW_API_KEY="..."
+export ZAI_API_KEY="..."
+export DASHSCOPE_API_KEY="..."
 ```
+
+Any provider also accepts a `base_url` override in config (regions,
+proxies, gateways). Note: DashScope keys are region-bound — the base URL
+must match the key's region — and it can be strict about tool payloads;
+if Qwen tool calls fail, retry with plain chat first.
 
 ## Usage
 
