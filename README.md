@@ -195,6 +195,18 @@ terbash/
 └── install.sh
 ```
 
+## Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| **Linux ARM64** | ✅ Tested | Primary development target |
+| **Linux AMD64** | ✅ Works | Standard x86_64 Linux |
+| **Android/Termux ARM64** | ✅ Tested | Via install.sh |
+| **macOS ARM64 (Apple Silicon)** | ⚠️ Untested | Binary builds, no device to verify |
+| **Windows ARM64** | ⚠️ Untested | Binary builds, no device to verify |
+
+> **Note:** macOS ARM64 and Windows ARM64 binaries are cross-compiled but **have not been tested on real hardware**. If you have these devices, please report issues or confirm working.
+
 ## Requirements
 
 - Go 1.23+ (for building)
