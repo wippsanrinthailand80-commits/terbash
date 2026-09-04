@@ -28,6 +28,9 @@ func (r *Registry) registerBuiltins(cfg *types.Config, cwd string) {
 	r.tools["todo_write"] = NewTodoTool()
 	r.tools["process"] = NewProcessTool(cfg)
 	r.tools["env_vars"] = NewEnvTool()
+	r.tools["memory"] = NewMemoryTool(cfg)
+	r.tools["browser"] = NewBrowserTool()
+	r.tools["web_search"] = NewWebSearchTool()
 }
 
 func (r *Registry) Register(name string, tool types.ToolInterface) {

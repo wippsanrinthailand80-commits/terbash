@@ -68,6 +68,15 @@ func (t *GodotTool) Schema() types.ToolSchema {
 	}
 }
 
+// RequiresConfirm mirrors Execute: every headless run needs approval.
+func (t *GodotTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	op, _ := args["operation"].(string)
+	if op == "" {
+		op = "run"
+	}
+	return true, fmt.Sprintf("Godot %s?", op)
+}
+
 func (t *GodotTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	op, _ := args["operation"].(string)
 	if op == "" {
@@ -87,6 +96,12 @@ func (t *GodotTool) Execute(args map[string]interface{}) (*types.ToolResult, err
 	godotBin := t.config.Godot.BinaryPath
 	if godotBin == "" {
 		godotBin = "godot"
+	}
+
+	// Headless runs execute project code / write build artifacts,
+	// so they need approval like any other state-changing tool.
+	if !confirmAction(t.config.Tools.ConfirmCommands, fmt.Sprintf("Godot %s in %s?", op, projectPath)) {
+		return &types.ToolResult{Success: false, Error: "godot operation cancelled by user"}, nil
 	}
 
 	switch op {

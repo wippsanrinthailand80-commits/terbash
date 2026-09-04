@@ -44,6 +44,19 @@ func (t *HTTPTool) Schema() types.ToolSchema {
 	}
 }
 
+// RequiresConfirm mirrors Execute: only state-changing methods need it.
+func (t *HTTPTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	method := "GET"
+	if m, ok := args["method"].(string); ok && strings.TrimSpace(m) != "" {
+		method = strings.ToUpper(strings.TrimSpace(m))
+	}
+	if method != "GET" && method != "HEAD" {
+		rawURL, _ := args["url"].(string)
+		return true, fmt.Sprintf("%s %s?", method, rawURL)
+	}
+	return false, ""
+}
+
 func (t *HTTPTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	rawURL, _ := args["url"].(string)
 	rawURL = strings.TrimSpace(rawURL)

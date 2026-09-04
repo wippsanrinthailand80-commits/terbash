@@ -46,6 +46,24 @@ func (t *TermuxTool) Schema() types.ToolSchema {
 	}
 }
 
+// termuxSensitiveOps touch the device or read personal data - the chat
+// loop asks before running these (reads like battery/wifi stay free).
+var termuxSensitiveOps = map[string]bool{
+	"clipboard_get": true, "clipboard_set": true,
+	"notification": true, "location": true,
+	"contact_list": true, "sms_list": true,
+}
+
+// RequiresConfirm gates device actions and personal-data reads in chat.
+// (Execute itself stays prompt-free so one-shot CLI use is unchanged.)
+func (t *TermuxTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	op, _ := args["operation"].(string)
+	if termuxSensitiveOps[op] {
+		return true, fmt.Sprintf("Allow Termux %s?", op)
+	}
+	return false, ""
+}
+
 func (t *TermuxTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	op, _ := args["operation"].(string)
 	if op == "" {

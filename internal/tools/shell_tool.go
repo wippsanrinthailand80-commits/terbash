@@ -50,6 +50,13 @@ func (t *ShellTool) Schema() types.ToolSchema {
 	}
 }
 
+// RequiresConfirm: every shell execution needs approval (dangerous
+// patterns are additionally hard-blocked inside Execute).
+func (t *ShellTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	cmdStr, _ := args["command"].(string)
+	return true, fmt.Sprintf("Execute: %s?", cmdStr)
+}
+
 func (t *ShellTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	cmdStr, _ := args["command"].(string)
 	if cmdStr == "" {
@@ -78,13 +85,8 @@ func (t *ShellTool) Execute(args map[string]interface{}) (*types.ToolResult, err
 		}
 	}
 
-	if t.config.Tools.ConfirmCommands {
-		fmt.Printf("Execute: %s %s? [y/N]: ", cmdStr, strings.Join(argsList, " "))
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
-			return &types.ToolResult{Success: false, Error: "command cancelled by user"}, nil
-		}
+	if !confirmAction(t.config.Tools.ConfirmCommands, fmt.Sprintf("Execute: %s %s?", cmdStr, strings.Join(argsList, " "))) {
+		return &types.ToolResult{Success: false, Error: "command cancelled by user"}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)

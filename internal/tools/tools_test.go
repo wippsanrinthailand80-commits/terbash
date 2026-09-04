@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -204,5 +205,129 @@ func TestGitOps(t *testing.T) {
 	// Outside a repo: commands fail gracefully, never crash.
 	if res := run("status"); res.Success {
 		t.Log("unexpectedly inside a repo - continuing anyway")
+	}
+}
+
+func TestToolNeedsConfirm(t *testing.T) {
+	cfg := testCfg()
+	reg := NewRegistry(cfg, t.TempDir())
+
+	needs := func(name, argsJSON string) bool {
+		var args map[string]interface{}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			t.Fatal(err)
+		}
+		tool, ok := reg.Get(name)
+		if !ok {
+			t.Fatalf("tool %s not registered", name)
+		}
+		checker, ok := tool.(interface {
+			RequiresConfirm(map[string]interface{}) (bool, string)
+		})
+		if !ok {
+			return false
+		}
+		need, prompt := checker.RequiresConfirm(args)
+		if need && prompt == "" {
+			t.Fatalf("%s: empty prompt", name)
+		}
+		return need
+	}
+
+	cases := []struct {
+		tool string
+		args string
+		want bool
+	}{
+		{"file_operations", `{"operation":"read","path":"x"}`, false},
+		{"file_operations", `{"operation":"write","path":"x"}`, true},
+		{"file_operations", `{"operation":"delete","path":"x"}`, true},
+		{"shell_exec", `{"command":"ls"}`, true},
+		{"git_ops", `{"operation":"status"}`, false},
+		{"git_ops", `{"operation":"commit","message":"m"}`, true},
+		{"http_fetch", `{"url":"https://x"}`, false},
+		{"http_fetch", `{"url":"https://x","method":"POST"}`, true},
+		{"process", `{"operation":"list"}`, false},
+		{"process", `{"operation":"kill","pid":123}`, true},
+		{"godot_headless", `{"operation":"export"}`, true},
+		{"termux_api", `{"operation":"battery"}`, false},
+		{"termux_api", `{"operation":"notification"}`, true},
+		{"grep_search", `{"query":"x"}`, false},
+		{"todo_write", `{"operation":"add"}`, false},
+		{"env_vars", `{"operation":"get"}`, false},
+	}
+	for _, c := range cases {
+		if got := needs(c.tool, c.args); got != c.want {
+			t.Errorf("%s %s: need=%v want %v", c.tool, c.args, got, c.want)
+		}
+	}
+}
+
+func TestMemoryTool(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	tool := NewMemoryTool(testCfg())
+	res, _ := tool.Execute(map[string]interface{}{"operation": "save", "text": "user likes tea", "key": "prefs"})
+	if !res.Success {
+		t.Fatalf("save: %v", res)
+	}
+	res, _ = tool.Execute(map[string]interface{}{"operation": "save", "text": "user likes coffee", "key": "prefs"})
+	if !res.Success || !strings.Contains(res.Output, "Updated") {
+		t.Fatalf("upsert: %v", res)
+	}
+	res, _ = tool.Execute(map[string]interface{}{"operation": "search", "query": "coffee"})
+	if !res.Success || !strings.Contains(res.Output, "coffee") || strings.Contains(res.Output, "tea") {
+		t.Fatalf("search:\n%s", res.Output)
+	}
+	res, _ = tool.Execute(map[string]interface{}{"operation": "get", "key": "prefs"})
+	if !strings.Contains(res.Output, "coffee") {
+		t.Fatalf("get:\n%s", res.Output)
+	}
+	res, _ = tool.Execute(map[string]interface{}{"operation": "delete", "key": "prefs"})
+	if !res.Success {
+		t.Fatalf("delete: %v", res)
+	}
+	res, _ = tool.Execute(map[string]interface{}{"operation": "list"})
+	if res.Output != "No notes." {
+		t.Fatalf("expected empty, got:\n%s", res.Output)
+	}
+}
+
+func TestBrowserExtract(t *testing.T) {
+	page := `<html><head><title>Hi</title><script>var x=1</script></head><body><h1>Hello <b>world</b></h1><a href="/next">Next page</a><a href="javascript:void(0)">bad</a></body></html>`
+	title, text, links := extractReadable("https://example.com/a", []byte(page))
+	if title != "Hi" {
+		t.Fatalf("title: %q", title)
+	}
+	if !strings.Contains(text, "Hello") || !strings.Contains(text, "world") || strings.Contains(text, "var x") {
+		t.Fatalf("text: %q", text)
+	}
+	if len(links) != 1 || links[0].href != "https://example.com/next" || links[0].text != "Next page" {
+		t.Fatalf("links: %+v", links)
+	}
+}
+
+func TestWebSearchParse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body>
+<div class="result"><h2><a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fgo&amp;rut=x">Go language</a></h2>
+<a class="result__snippet" href="x">A programming language by Google</a></div>
+<div class="result"><h2><a class="result__a" href="https://plain.example.com/y">Plain link</a></h2></div>
+</body></html>`))
+	}))
+	defer srv.Close()
+
+	tool := &WebSearchTool{baseURL: srv.URL}
+	res, err := tool.Execute(map[string]interface{}{"query": "go", "max_results": float64(5)})
+	if err != nil || !res.Success {
+		t.Fatalf("search: %v %v", err, res)
+	}
+	if !strings.Contains(res.Output, "https://example.com/go") || !strings.Contains(res.Output, "A programming language") {
+		t.Fatalf("output:\n%s", res.Output)
+	}
+	if !strings.Contains(res.Output, "https://plain.example.com/y") {
+		t.Fatalf("plain link missing:\n%s", res.Output)
 	}
 }

@@ -48,6 +48,21 @@ func (t *FileTool) Schema() types.ToolSchema {
 	}
 }
 
+// RequiresConfirm mirrors Execute: writes and deletes need approval,
+// reads and listings never do.
+func (t *FileTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	op, _ := args["operation"].(string)
+	path, _ := args["path"].(string)
+	switch op {
+	case "write":
+		return true, fmt.Sprintf("Write to %s?", path)
+	case "delete":
+		return true, fmt.Sprintf("Delete %s?", path)
+	default:
+		return false, ""
+	}
+}
+
 func (t *FileTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	op, _ := args["operation"].(string)
 	path, _ := args["path"].(string)

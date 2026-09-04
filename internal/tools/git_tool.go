@@ -46,6 +46,15 @@ func (t *GitTool) Schema() types.ToolSchema {
 
 var gitMutating = map[string]bool{"add": true, "commit": true, "push": true}
 
+// RequiresConfirm mirrors Execute: add/commit/push need approval.
+func (t *GitTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	op, _ := args["operation"].(string)
+	if gitMutating[op] {
+		return true, fmt.Sprintf("git %s?", op)
+	}
+	return false, ""
+}
+
 func (t *GitTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	op, _ := args["operation"].(string)
 	extra, _ := args["args"].(string)

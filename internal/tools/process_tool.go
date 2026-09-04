@@ -46,6 +46,15 @@ func (t *ProcessTool) Schema() types.ToolSchema {
 	}
 }
 
+// RequiresConfirm mirrors Execute: only killing needs approval.
+func (t *ProcessTool) RequiresConfirm(args map[string]interface{}) (bool, string) {
+	op, _ := args["operation"].(string)
+	if op == "kill" {
+		return true, fmt.Sprintf("Kill PID %v?", args["pid"])
+	}
+	return false, ""
+}
+
 func (t *ProcessTool) Execute(args map[string]interface{}) (*types.ToolResult, error) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "android" {
 		return &types.ToolResult{Success: false, Error: fmt.Sprintf("process tool supports linux only (running on %s)", runtime.GOOS)}, nil

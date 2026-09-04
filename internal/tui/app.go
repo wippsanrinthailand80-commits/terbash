@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,6 +13,10 @@ import (
 	"github.com/terbash/terbash/internal/tools"
 	"github.com/terbash/terbash/pkg/types"
 )
+
+// maxToolIters bounds the agentic loop: user message -> LLM -> tools ->
+// LLM ... stops after this many LLM turns even if tools keep coming.
+const maxToolIters = 8
 
 // Version is set by the CLI entrypoint (dev when built without ldflags).
 var Version = "dev"
@@ -32,6 +37,71 @@ type App struct {
 	// Provider picker overlay state (opened by /providers or /provider).
 	pickingProvider bool
 	providerIdx     int
+	// Agentic tool-loop state for the current user message.
+	streamCh      <-chan types.StreamChunk
+	toolIter      int
+	pendingCalls  []types.ToolCall
+	fragTools     []*toolFrag
+	confirmCall   *types.ToolCall
+	confirmPrompt string
+}
+
+// toolFrag accumulates one streamed tool call. Providers send arguments
+// in fragments across chunks, so we stitch by call ID (falling back to
+// the last open call when a fragment carries no ID).
+type toolFrag struct {
+	id   string
+	name string
+	args strings.Builder
+}
+
+func mergeToolFrag(frags *[]*toolFrag, tc types.ToolCall) {
+	if tc.ID != "" {
+		for _, f := range *frags {
+			if f.id == tc.ID {
+				if tc.Function.Name != "" && f.name == "" {
+					f.name = tc.Function.Name
+				}
+				f.args.WriteString(tc.Function.Arguments)
+				return
+			}
+		}
+		f := &toolFrag{id: tc.ID, name: tc.Function.Name}
+		f.args.WriteString(tc.Function.Arguments)
+		*frags = append(*frags, f)
+		return
+	}
+	if len(*frags) > 0 {
+		last := (*frags)[len(*frags)-1]
+		if tc.Function.Name == "" || last.name == "" || tc.Function.Name == last.name {
+			if tc.Function.Name != "" && last.name == "" {
+				last.name = tc.Function.Name
+			}
+			last.args.WriteString(tc.Function.Arguments)
+			return
+		}
+	}
+	f := &toolFrag{name: tc.Function.Name}
+	f.args.WriteString(tc.Function.Arguments)
+	*frags = append(*frags, f)
+}
+
+func fragsToCalls(frags []*toolFrag) []types.ToolCall {
+	var out []types.ToolCall
+	for _, f := range frags {
+		if f.name == "" && f.args.Len() == 0 {
+			continue
+		}
+		out = append(out, types.ToolCall{
+			ID:   f.id,
+			Type: "function",
+			Function: types.FunctionCall{
+				Name:      f.name,
+				Arguments: f.args.String(),
+			},
+		})
+	}
+	return out
 }
 
 type Styles struct {
@@ -119,6 +189,9 @@ func NewApp(cfg *types.Config) *App {
 
 	llmManager, _ := llm.NewManager(cfg)
 	toolReg := tools.NewRegistry(cfg, ".")
+	// The chat loop shows its own approval overlay before executing, so
+	// tools must never block on stdin while the fullscreen TUI owns it.
+	tools.ConfirmFunc = func(enabled bool, prompt string) bool { return true }
 
 	return &App{
 		config:     cfg,
@@ -178,11 +251,55 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.handleKey(msg)
 	case tea.WindowSizeMsg:
 		return a, nil
+	case waitChunkMsg:
+		return a, waitForChunk(msg.stream)
+	case streamChunkMsg:
+		return a.handleStreamChunk(msg)
+	case streamDoneMsg:
+		return a.finishStream()
+	case streamErrorMsg:
+		a.streaming = false
+		a.toolIter = 0
+		a.pendingCalls = nil
+		a.fragTools = nil
+		a.addSystemMessage(fmt.Sprintf("LLM error: %v", msg.err))
+		return a, nil
+	case toolResultMsg:
+		return a.handleToolResult(msg)
 	}
 	return a, nil
 }
 
 func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Tool approval overlay takes over ALL keys while open: the chat box
+	// must not eat the y/n answer, and Enter must not send a message.
+	if a.confirmCall != nil {
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			a.quitting = true
+			return a, tea.Quit
+		case tea.KeyRunes, tea.KeySpace:
+			if len(msg.Runes) == 1 {
+				switch strings.ToLower(string(msg.Runes)) {
+				case "y":
+					call := *a.confirmCall
+					a.confirmCall = nil
+					return a, a.execToolCmd(call)
+				case "n":
+					a.denyConfirm()
+					return a, a.driveToolQueue()
+				}
+			}
+			return a, nil
+		case tea.KeyEnter, tea.KeyEsc:
+			// [y/N] defaults to No.
+			a.denyConfirm()
+			return a, a.driveToolQueue()
+		default:
+			return a, nil
+		}
+	}
+
 	// Provider picker overlay takes over keys while open.
 	// Arrow keys do not exist on some mobile keyboards, so j/k,
 	// Ctrl+P/Ctrl+N and number keys work as alternatives.
@@ -353,8 +470,28 @@ func (a *App) processInput() tea.Cmd {
 	a.messages = append(a.messages, types.Message{Role: "user", Content: userInput})
 	a.streaming = true
 	a.streamBuf.Reset()
+	a.toolIter = 1
+	a.pendingCalls = nil
+	a.fragTools = nil
+	a.confirmCall = nil
 
 	return a.streamLLM()
+}
+
+// denyConfirm records a user-rejected tool call as a tool message so the
+// model sees the refusal and can adapt.
+func (a *App) denyConfirm() {
+	if a.confirmCall == nil {
+		return
+	}
+	call := *a.confirmCall
+	a.confirmCall = nil
+	a.messages = append(a.messages, types.Message{
+		Role:       "tool",
+		ToolCallID: call.ID,
+		Name:       call.Function.Name,
+		Content:    "Denied by user - do not retry this call, work around it or ask.",
+	})
 }
 
 func (a *App) handleCommand(input string) tea.Cmd {
@@ -524,8 +661,133 @@ func (a *App) streamLLM() tea.Cmd {
 			return streamErrorMsg{err: err}
 		}
 
-		return streamStartMsg{stream: stream}
+		return waitChunkMsg{stream: stream}
 	}
+}
+
+// waitForChunk reads one streamed chunk, then yields back so the UI stays
+// live. The stream ends as streamDoneMsg.
+func waitForChunk(stream <-chan types.StreamChunk) tea.Cmd {
+	return func() tea.Msg {
+		chunk, ok := <-stream
+		if !ok {
+			return streamDoneMsg{}
+		}
+		return streamChunkMsg{chunk: chunk, stream: stream}
+	}
+}
+
+func (a *App) handleStreamChunk(msg streamChunkMsg) (tea.Model, tea.Cmd) {
+	for _, choice := range msg.chunk.Choices {
+		if choice.Delta.Content != "" {
+			a.streamBuf.WriteString(choice.Delta.Content)
+		}
+		for _, tc := range choice.Delta.ToolCalls {
+			mergeToolFrag(&a.fragTools, tc)
+		}
+	}
+	return a, waitForChunk(msg.stream)
+}
+
+// finishStream closes one LLM turn: records the assistant message and,
+// when the model asked for tools, queues them instead of ending the turn.
+func (a *App) finishStream() (tea.Model, tea.Cmd) {
+	calls := fragsToCalls(a.fragTools)
+	a.fragTools = nil
+	content := a.streamBuf.String()
+	if content != "" || len(calls) > 0 {
+		a.messages = append(a.messages, types.Message{
+			Role:      "assistant",
+			Content:   content,
+			ToolCalls: calls,
+		})
+	}
+	if len(calls) == 0 {
+		a.streaming = false
+		a.toolIter = 0
+		return a, nil
+	}
+	if a.toolIter >= maxToolIters {
+		a.addSystemMessage(fmt.Sprintf("Stopped after %d tool rounds.", maxToolIters))
+		a.streaming = false
+		a.toolIter = 0
+		return a, nil
+	}
+	a.pendingCalls = append([]types.ToolCall(nil), calls...)
+	return a, a.driveToolQueue()
+}
+
+// driveToolQueue runs the next queued tool call: approval overlay first
+// when the tool declares it needs one, background execution otherwise.
+// An empty queue means all results are in - feed them back to the model.
+func (a *App) driveToolQueue() tea.Cmd {
+	if len(a.pendingCalls) == 0 {
+		a.toolIter++
+		return a.streamLLM()
+	}
+	call := a.pendingCalls[0]
+	a.pendingCalls = a.pendingCalls[1:]
+	if ok, prompt := toolNeedsConfirm(a.toolReg, call); ok {
+		c := call
+		a.confirmCall = &c
+		a.confirmPrompt = prompt
+		return nil
+	}
+	return a.execToolCmd(call)
+}
+
+func (a *App) execToolCmd(call types.ToolCall) tea.Cmd {
+	return func() tea.Msg {
+		var args map[string]interface{}
+		if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+			args = map[string]interface{}{}
+		}
+		res, err := a.toolReg.Execute(call.Function.Name, args)
+		if err != nil {
+			res = &types.ToolResult{Success: false, Error: err.Error()}
+		}
+		return toolResultMsg{call: call, result: res}
+	}
+}
+
+func (a *App) handleToolResult(msg toolResultMsg) (tea.Model, tea.Cmd) {
+	content := msg.result.Output
+	if !msg.result.Success {
+		if msg.result.Error != "" {
+			content = "Error: " + msg.result.Error
+		} else if content == "" {
+			content = "Error: tool failed with no output."
+		}
+	}
+	a.messages = append(a.messages, types.Message{
+		Role:       "tool",
+		ToolCallID: msg.call.ID,
+		Name:       msg.call.Function.Name,
+		Content:    content,
+	})
+	return a, a.driveToolQueue()
+}
+
+// toolNeedsConfirm parses a streamed call and asks the tool whether these
+// args need approval. Unknown tools and unparseable args fail closed: the
+// former is reported by Execute, the latter needs a human look.
+func toolNeedsConfirm(reg *tools.Registry, call types.ToolCall) (bool, string) {
+	tool, ok := reg.Get(call.Function.Name)
+	if !ok {
+		return false, ""
+	}
+	checker, ok := tool.(types.ConfirmChecker)
+	if !ok {
+		return false, ""
+	}
+	var args map[string]interface{}
+	if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
+		return true, fmt.Sprintf("Run %s with unparseable args?", call.Function.Name)
+	}
+	if args == nil {
+		args = map[string]interface{}{}
+	}
+	return checker.RequiresConfirm(args)
 }
 
 func (a *App) convertTools(tools []types.ToolInterface) []types.Tool {
@@ -587,6 +849,17 @@ func (a *App) View() string {
 			b.WriteString(a.styles.Base.Render(rendered))
 		}
 		b.WriteString(a.styles.Cursor.Render("█"))
+		b.WriteString("\n\n")
+	}
+
+	// Tool approval overlay: blocks the input box until answered.
+	if a.confirmCall != nil {
+		b.WriteString(a.styles.ToolMsg.Render(fmt.Sprintf("🔧 %s [y/N]", a.confirmPrompt)))
+		b.WriteString("\n")
+		b.WriteString(a.styles.Help.Render("y: allow once • n / Enter / Esc: deny"))
+		b.WriteString("\n\n")
+	} else if a.streaming && (len(a.pendingCalls) > 0 || a.toolIter > 1) {
+		b.WriteString(a.styles.ToolMsg.Render("🔧 running tools…"))
 		b.WriteString("\n\n")
 	}
 
@@ -665,12 +938,24 @@ func (a *App) View() string {
 	return b.String()
 }
 
-type streamStartMsg struct {
+type waitChunkMsg struct {
 	stream <-chan types.StreamChunk
 }
 
+type streamChunkMsg struct {
+	chunk  types.StreamChunk
+	stream <-chan types.StreamChunk
+}
+
+type streamDoneMsg struct{}
+
 type streamErrorMsg struct {
 	err error
+}
+
+type toolResultMsg struct {
+	call   types.ToolCall
+	result *types.ToolResult
 }
 
 func (a *App) Run() error {

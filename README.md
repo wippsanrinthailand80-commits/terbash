@@ -234,6 +234,14 @@ You'll be prompted for confirmation before anything destructive:
 | `todo_write` | session task list | never |
 | `process` | list processes, kill by PID (Linux) | kill |
 | `env_vars` | read env vars (secrets redacted unless `reveal=true`) | never |
+| `memory` | persistent agent notebook (`~/.config/terbash/memory.json`) | clear |
+| `browser` | open a page as text + numbered links (no JavaScript) | never |
+| `web_search` | DuckDuckGo search, no key (may rate-limit) | never |
+
+In chat the agent runs a real loop: streamed reply → tool calls execute
+(max 8 rounds) → results fed back → final answer. Destructive calls pause
+on a `🔧 … [y/N]` overlay (`y` once, `n`/Enter/Esc denies); denials are
+told to the model so it adapts.
 
 All file tools are sandboxed to the working directory (no `../` escapes),
 HTTP is limited to `http(s)` with a 1 MB response cap, and `process`

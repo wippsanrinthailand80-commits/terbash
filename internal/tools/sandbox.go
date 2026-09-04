@@ -34,9 +34,10 @@ func resolveSandbox(cwd, relPath string) (string, error) {
 	return abs, nil
 }
 
-// confirmAction prints a [y/N] prompt when enabled and reports whether
-// the user approved. Destructive operations must gate on this.
-func confirmAction(enabled bool, prompt string) bool {
+// ConfirmFunc performs the actual [y/N] interaction. The default reads
+// stdin; interactive UIs override it (e.g. auto-approve because they show
+// their own approval overlay before executing).
+var ConfirmFunc = func(enabled bool, prompt string) bool {
 	if !enabled {
 		return true
 	}
@@ -45,4 +46,10 @@ func confirmAction(enabled bool, prompt string) bool {
 	fmt.Scanln(&answer)
 	answer = strings.ToLower(strings.TrimSpace(answer))
 	return answer == "y" || answer == "yes"
+}
+
+// confirmAction prints a [y/N] prompt when enabled and reports whether
+// the user approved. Destructive operations must gate on this.
+func confirmAction(enabled bool, prompt string) bool {
+	return ConfirmFunc(enabled, prompt)
 }
