@@ -129,13 +129,21 @@ terbash
 terbash update -y   # self-update to latest release
 ```
 
+Type `/` to open the command palette — matching commands appear
+below the input box, filtered as you type:
+
+- `↑` / `↓` - Move selection
+- `Tab` or `Enter` - Complete the selected command
+- `Esc` - Close the palette (`Ctrl+C` still quits)
+
 Commands:
-- `/help` - Show commands
+- `/help` - Show all commands
 - `/providers` - List configured providers
 - `/tools` - List available tools
 - `/clear` - Clear conversation
 - `/config` - Show current config
-- `/exit` - Quit
+- `/update` - Self-update hint (exit chat, run `terbash update`)
+- `/exit` - Quit (also `/quit`)
 
 ### Tool Calling
 The agent can use tools automatically. You'll be prompted for confirmation before:
