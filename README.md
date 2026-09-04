@@ -121,9 +121,23 @@ ui:
   stream_output: true
 ```
 
+### API keys: prompt, env vars, or config file
+
+If the active provider has no key, `terbash` asks once at startup
+(hidden input): type the key to save it, press Enter to skip, or type
+`exit` to quit. Save/change a key anytime without chatting:
+
+```bash
+terbash config set-key groq              # prompts with hidden input
+terbash config set-key groq --key sk-... # non-interactive
+```
+
+Keys are stored owner-only (`0600`). File values win over env vars.
+
 ### Environment Variable Fallbacks
 
-All providers support environment variable fallbacks for API keys:
+All providers support environment variable fallbacks for API keys
+(exporting one even auto-registers that provider):
 
 ```bash
 export OPENAI_API_KEY="sk-..."

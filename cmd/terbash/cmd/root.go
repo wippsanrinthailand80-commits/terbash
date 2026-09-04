@@ -55,6 +55,16 @@ func initConfig() {
 
 func runInteractive() error {
 	tui.Version = Version
+	// cfg is loaded by PersistentPreRunE. Plain-terminal prompt here -
+	// the fullscreen TUI cannot do hidden input well.
+	quit, err := ensureAPIKey(cfg)
+	if err != nil {
+		return err
+	}
+	if quit {
+		fmt.Println("Goodbye!")
+		return nil
+	}
 	app := tui.NewApp(cfg)
 	return app.Run()
 }

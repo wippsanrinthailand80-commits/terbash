@@ -2,6 +2,7 @@ package llm
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -149,6 +150,19 @@ func (m *Manager) SetDefaultProvider(name string) error {
 	}
 	m.defaultProvider = p
 	return nil
+}
+
+// EffectiveAPIKey returns the API key a provider will actually use:
+// config file first, then its native env var. "" means none found.
+func (m *Manager) EffectiveAPIKey(name string) string {
+	p := types.Provider(strings.ToLower(strings.TrimSpace(name)))
+	if e, ok := m.config.Providers[p]; ok && strings.TrimSpace(e.APIKey) != "" {
+		return e.APIKey
+	}
+	if key := types.EnvKey(p); key != "" {
+		return strings.TrimSpace(os.Getenv(key))
+	}
+	return ""
 }
 
 // ProviderModel returns the configured model for a provider, or "".

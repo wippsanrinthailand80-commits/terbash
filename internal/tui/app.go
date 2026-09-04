@@ -353,7 +353,8 @@ func (a *App) handleCommand(input string) tea.Cmd {
 			if err := a.llmManager.SetDefaultProvider(parts[1]); err != nil {
 				a.addSystemMessage(err.Error())
 			} else {
-				a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)", a.llmManager.DefaultProviderName(), a.llmManager.ProviderModel(parts[1])))
+				name := a.llmManager.DefaultProviderName()
+				a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)%s", name, a.llmManager.ProviderModel(parts[1]), a.keyNote(name)))
 			}
 		} else {
 			a.openProviderPicker()
@@ -458,10 +459,23 @@ func (a *App) chooseProvider() {
 	}
 	model := a.llmManager.ProviderModel(name)
 	if model != "" {
-		a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)%s", name, model, note))
+		a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)%s%s", name, model, note, a.keyNote(name)))
 	} else {
-		a.addSystemMessage(fmt.Sprintf("Switched provider to %s%s", name, note))
+		a.addSystemMessage(fmt.Sprintf("Switched provider to %s%s%s", name, note, a.keyNote(name)))
 	}
+}
+
+// keyNote tells the user how to add a missing API key, or "" when the
+// provider is ready (key in config/env) or needs none (local providers).
+func (a *App) keyNote(name string) string {
+	p := types.Provider(name)
+	if !types.RequiresKey(p) || a.llmManager.EffectiveAPIKey(name) != "" {
+		return ""
+	}
+	if key := types.EnvKey(p); key != "" {
+		return fmt.Sprintf(" — no API key: exit chat and run `terbash config set-key %s` (or set %s)", name, key)
+	}
+	return fmt.Sprintf(" — no API key: exit chat and run `terbash config set-key %s`", name)
 }
 
 func (a *App) streamLLM() tea.Cmd {

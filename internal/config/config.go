@@ -50,6 +50,8 @@ func Load(configFile string) (*types.Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	applyNativeEnvKeys(cfg)
+
 	if err := Validate(cfg); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -96,6 +98,57 @@ func EnsureProviderEntry(path string, name types.Provider, entry types.ProviderC
 		v.Set(prefix+"max_tokens", entry.MaxTokens)
 	}
 	return v.WriteConfigAs(path)
+}
+
+// applyNativeEnvKeys fills empty api_key fields from provider-native env
+// vars (OPENAI_API_KEY, GROQ_API_KEY, ...). File values always win, and the
+// file is never modified - this is memory-only.
+func applyNativeEnvKeys(cfg *types.Config) {
+	if cfg.Providers == nil {
+		cfg.Providers = make(map[types.Provider]types.ProviderConfig)
+	}
+	for _, name := range types.SupportedProviders() {
+		key := types.EnvKey(name)
+		if key == "" {
+			continue
+		}
+		if v := strings.TrimSpace(os.Getenv(key)); v == "" {
+			continue
+		}
+		entry := cfg.Providers[name]
+		if entry.APIKey != "" {
+			continue
+		}
+		entry.APIKey = strings.TrimSpace(os.Getenv(key))
+		if entry.Model == "" {
+			if def, ok := types.DefaultModel(name); ok {
+				entry.Model = def
+			}
+		}
+		cfg.Providers[name] = entry
+	}
+}
+
+// SetProviderAPIKey writes (or overwrites) a provider's api_key in the
+// config file and tightens the file to owner-only, since it holds secrets.
+func SetProviderAPIKey(path string, name types.Provider, apiKey string) error {
+	if strings.TrimSpace(apiKey) == "" {
+		return fmt.Errorf("API key must not be empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	v := viper.New()
+	v.SetConfigType("yaml")
+	v.SetConfigFile(path)
+	_ = v.ReadInConfig() // ignore missing file on fresh machines
+	v.Set("providers."+string(name)+".api_key", apiKey)
+	if err := v.WriteConfigAs(path); err != nil {
+		return err
+	}
+	// Best-effort: secrets file should not be world-readable.
+	_ = os.Chmod(path, 0600)
+	return nil
 }
 
 func Validate(c *types.Config) error {

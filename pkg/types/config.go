@@ -84,6 +84,10 @@ func DefaultModel(name Provider) (string, bool) {
 	return m, ok
 }
 
+// RequiresKey reports whether a provider needs an API key.
+// Local providers (ollama, llamacpp) don't; everything else does.
+func RequiresKey(name Provider) bool { return EnvKey(name) != "" }
+
 // EnvKey returns the API-key environment variable for a provider, or "".
 func EnvKey(name Provider) string {
 	keys := map[Provider]string{

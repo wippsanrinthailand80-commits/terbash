@@ -112,6 +112,37 @@ func TestCustomEndpointByName(t *testing.T) {
 	}
 }
 
+func TestEffectiveAPIKey(t *testing.T) {
+	t.Setenv("GROQ_API_KEY", "env-key")
+	m, err := NewManager(&types.Config{
+		DefaultProvider: types.ProviderGroq,
+		Providers: map[types.Provider]types.ProviderConfig{
+			types.ProviderGroq:  {Model: "m", APIKey: "file-key"},
+			types.ProviderOpenAI: {Model: "m"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	if got := m.EffectiveAPIKey("groq"); got != "file-key" {
+		t.Fatalf("file key should win: %q", got)
+	}
+	m2, err := NewManager(&types.Config{
+		DefaultProvider: types.ProviderOllama,
+		Providers:       map[types.Provider]types.ProviderConfig{},
+	})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	_ = m2.EnsureProvider("groq")
+	if got := m2.EffectiveAPIKey("groq"); got != "env-key" {
+		t.Fatalf("env fallback expected: %q", got)
+	}
+	if got := m2.EffectiveAPIKey("ollama"); got != "" {
+		t.Fatalf("local provider should have no key: %q", got)
+	}
+}
+
 func TestSetDefaultProvider(t *testing.T) {
 	m, err := NewManager(testConfig())
 	if err != nil {
