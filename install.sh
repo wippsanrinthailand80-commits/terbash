@@ -29,7 +29,13 @@ ASSET="${BINARY_NAME}-${GOOS}-${GOARCH}"
 if [ "$GOOS" = "windows" ]; then
   ASSET="${ASSET}.exe"
 fi
-LATEST_URL="https://github.com/$REPO/releases/latest/download/${ASSET}"
+if [ -n "${TERBASH_MIRROR:-}" ]; then
+  # Backup host: plain HTTPS dir with files named like $ASSET.
+  # Usage: TERBASH_MIRROR=https://mirror.example.com/terbash bash install.sh
+  LATEST_URL="${TERBASH_MIRROR%/}/${ASSET}"
+else
+  LATEST_URL="https://github.com/$REPO/releases/latest/download/${ASSET}"
+fi
 
 echo "Downloading from: $LATEST_URL"
 
@@ -44,10 +50,18 @@ try_download() {
     elif command -v wget >/dev/null 2>&1; then
         wget -q --tries=3 -O "$INSTALL_DIR/$BINARY_NAME" -- "$1"
     else
-        echo "Error: curl or wget required"
-        return 2
+    echo "Error: curl or wget required"
+    return 2
     fi
 }
+
+# Back up BEFORE downloading: a bad install can be rolled back with:
+#   mv "$INSTALL_DIR/$BINARY_NAME.bak" "$INSTALL_DIR/$BINARY_NAME"
+# (rollback of a `terbash update` works the same via: terbash update --rollback)
+if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
+    cp -f "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME.bak"
+    echo "Previous binary backed up to $INSTALL_DIR/$BINARY_NAME.bak"
+fi
 
 if try_download "$LATEST_URL"; then
     :

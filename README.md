@@ -44,6 +44,23 @@ terbash update            # download latest release and replace binary (asks fir
 terbash update -y         # update without confirmation
 terbash update --check    # only print the download URL, do not install
 terbash update --version v0.1.0   # install a specific release tag
+terbash update --rollback # restore the pre-update backup (terbash.bak)
+terbash update --mirror https://mirror.example.com/terbash  # alternate host
+```
+
+Every update keeps the previous binary as `terbash.bak` next to the
+binary — if a new version breaks, `terbash update --rollback` (or
+`mv terbash.bak terbash` by hand) restores it. `install.sh` makes the
+same `.bak` backup before overwriting.
+
+If github.com is blocked on your network but you have a mirror (any
+plain HTTPS directory with files named `terbash-<os>-<arch>`):
+
+```bash
+# installer:
+TERBASH_MIRROR=https://mirror.example.com/terbash bash install.sh
+# updater:
+terbash update --mirror https://mirror.example.com/terbash
 ```
 
 > Paths containing spaces are supported by both `install.sh` and `terbash update`.
