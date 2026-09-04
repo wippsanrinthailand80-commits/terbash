@@ -36,21 +36,40 @@ echo "Downloading from: $LATEST_URL"
 mkdir -p "$INSTALL_DIR"
 mkdir -p "$CONFIG_DIR"
 
-if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL --proto '=https' -- "$LATEST_URL" -o "$INSTALL_DIR/$BINARY_NAME"; then
-        echo "Error: download failed (404?)."
-        echo "The release asset '$ASSET' was not found at $LATEST_URL"
+try_download() {
+    # $1 = url, downloads to $INSTALL_DIR/$BINARY_NAME
+    # NOTE: -o/-O must come BEFORE "--" (everything after "--" is a URL).
+    if command -v curl >/dev/null 2>&1; then
+        curl -fSL --retry 3 --retry-delay 2 -o "$INSTALL_DIR/$BINARY_NAME" -- "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --tries=3 -O "$INSTALL_DIR/$BINARY_NAME" -- "$1"
+    else
+        echo "Error: curl or wget required"
+        return 2
+    fi
+}
+
+if try_download "$LATEST_URL"; then
+    :
+else
+    echo "Download from latest-redirect failed, resolving exact release tag..."
+    TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | head -n 1 | cut -d'"' -f4 || true)"
+    if [ -n "${TAG:-}" ]; then
+        PINNED_URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
+        echo "Retrying with: $PINNED_URL"
+        if ! try_download "$PINNED_URL"; then
+            echo "Error: download failed."
+            echo "Tried: $LATEST_URL"
+            echo "Tried: $PINNED_URL"
+            echo "Check https://github.com/$REPO/releases for available files."
+            exit 1
+        fi
+    else
+        echo "Error: download failed and could not resolve release tag."
+        echo "Tried: $LATEST_URL"
         echo "Check https://github.com/$REPO/releases for available files."
         exit 1
     fi
-elif command -v wget >/dev/null 2>&1; then
-    if ! wget -q -- "$LATEST_URL" -O "$INSTALL_DIR/$BINARY_NAME"; then
-        echo "Error: download failed. Check https://github.com/$REPO/releases"
-        exit 1
-    fi
-else
-    echo "Error: curl or wget required"
-    exit 1
 fi
 
 chmod +x -- "$INSTALL_DIR/$BINARY_NAME"
