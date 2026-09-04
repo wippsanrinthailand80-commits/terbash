@@ -14,6 +14,7 @@ const (
 	ProviderDeepSeek    Provider = "deepseek"
 	ProviderXAI         Provider = "xai"
 	ProviderOllama      Provider = "ollama"
+	ProviderLlamaCpp    Provider = "llamacpp"
 	ProviderCustom      Provider = "custom"
 )
 
@@ -42,6 +43,7 @@ func SupportedProviders() []Provider {
 		ProviderDeepSeek,
 		ProviderGemini,
 		ProviderGroq,
+		ProviderLlamaCpp,
 		ProviderMistral,
 		ProviderOllama,
 		ProviderOpenAI,
@@ -75,6 +77,8 @@ func DefaultModel(name Provider) (string, bool) {
 		ProviderDeepSeek:   "deepseek-chat",
 		ProviderXAI:        "grok-beta",
 		ProviderOllama:     "llama3.2:3b",
+		// llama-server serves whatever GGUF is loaded and echoes this name.
+		ProviderLlamaCpp: "default",
 	}
 	m, ok := models[name]
 	return m, ok

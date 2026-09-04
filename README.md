@@ -285,12 +285,46 @@ terbash/
 
 > **Note:** macOS ARM64 and Windows ARM64 binaries are cross-compiled but **have not been tested on real hardware**. If you have these devices, please report issues or confirm working.
 
+## Lightweight local inference (llama.cpp, no Ollama needed)
+
+Ollama's inference core is already C/C++ (`llama.cpp`) — its Go layer is
+just an API server. On RAM-tight Termux devices you can skip Ollama
+entirely and point terbash at `llama-server` directly via the `llamacpp`
+provider (OpenAI-compatible API on `localhost:8080`).
+
+```bash
+# Termux: build llama-server (pure C/C++, no runtime deps)
+pkg install cmake clang git
+git clone https://github.com/ggml-org/llama.cpp
+cmake -B build -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j
+
+# Run a small quant (1-3B, Q4_K_M or smaller - see RAM tips below)
+./build/bin/llama-server -m model.gguf \
+  --host 127.0.0.1 --port 8080 --ctx-size 2048 --parallel 1
+```
+
+```bash
+# terbash side (Ollama-style workflow, same chat/tools):
+terbash config add-provider --name llamacpp --set-default
+terbash status   # provider: llamacpp
+```
+
+Custom port? `terbash config add-provider --name llamacpp --base-url http://localhost:8081/v1`.
+The `ollama` provider keeps working untouched if you prefer `ollama serve`.
+
+RAM tips (biggest wins first):
+- Small models + aggressive quants: 1–3B at `Q4_K_M`, or `Q3_K_S` / `IQ3_XS` on ≤4 GB devices
+- Small context: `--ctx-size 1024`–`2048` (context memory scales with it)
+- `--parallel 1` (one request slot), match `--threads` to your cores
+- `-fa 1` (flash attention lowers KV-cache memory on longer contexts)
+
 ## Requirements
 
 - Go 1.23+ (for building)
 - Termux:API app (for Termux features on Android)
 - Godot 4.x (for Godot tool)
-- Ollama (for local models, optional)
+- Ollama (for local models, optional) or llama.cpp `llama-server` (lighter)
 
 ## License
 

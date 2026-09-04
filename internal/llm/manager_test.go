@@ -83,14 +83,16 @@ func TestAllProviderNames(t *testing.T) {
 	if len(names) < 12 {
 		t.Fatalf("expected all built-ins listed, got %v", names)
 	}
-	found := false
-	for _, n := range names {
-		if n == "groq" {
-			found = true
+	for _, want := range []string{"groq", "llamacpp"} {
+		found := false
+		for _, n := range names {
+			if n == want {
+				found = true
+			}
 		}
-	}
-	if !found {
-		t.Fatalf("groq missing from %v", names)
+		if !found {
+			t.Fatalf("%s missing from %v", want, names)
+		}
 	}
 }
 

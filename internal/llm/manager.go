@@ -71,6 +71,8 @@ func (m *Manager) createProvider(name types.Provider, cfg types.ProviderConfig) 
 		return providers.NewGeminiProvider(cfg), nil
 	case types.ProviderOllama:
 		return providers.NewOllamaProvider(cfg), nil
+	case types.ProviderLlamaCpp:
+		return providers.NewLlamaCppProvider(cfg), nil
 	default:
 		// Any other name is treated as an OpenAI-compatible custom
 		// endpoint, as long as a base_url is configured.

@@ -141,3 +141,14 @@ func NewXAIProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
 func NewCustomProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
 	return NewOpenAICompatibleProvider(config, config.BaseURL)
 }
+
+// NewLlamaCppProvider talks to a local llama.cpp server (llama-server),
+// which exposes an OpenAI-compatible API. Pure C/C++ inference with no
+// Ollama/Go overhead - ideal for Termux. Override the port via base_url.
+func NewLlamaCppProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
+	baseURL := config.BaseURL
+	if baseURL == "" {
+		baseURL = "http://localhost:8080/v1"
+	}
+	return NewOpenAICompatibleProvider(config, baseURL)
+}
