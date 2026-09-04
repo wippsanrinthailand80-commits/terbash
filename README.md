@@ -138,12 +138,24 @@ below the input box, filtered as you type:
 
 Commands:
 - `/help` - Show all commands
-- `/providers` - List configured providers
+- `/providers` - Open the provider picker (interactive list, pick one to switch)
+- `/provider <name>` - Switch provider directly, e.g. `/provider groq`
 - `/tools` - List available tools
 - `/clear` - Clear conversation
-- `/config` - Show current config
+- `/config` - Show active provider, provider/tool counts
 - `/update` - Self-update hint (exit chat, run `terbash update`)
 - `/exit` - Quit (also `/quit`)
+
+### Switching provider
+
+Run `/providers` and a selectable list appears below the input —
+each row shows the provider, its model, and which one is active (`●`):
+
+- `↑` / `↓` - Move selection
+- `Enter` - Switch to the highlighted provider
+- `Esc` - Cancel (typing anything else also closes the list)
+
+The switch applies instantly to the rest of your chat session.
 
 ### Tool Calling
 The agent can use tools automatically. You'll be prompted for confirmation before:

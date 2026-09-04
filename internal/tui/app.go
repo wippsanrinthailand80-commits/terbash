@@ -25,6 +25,9 @@ type App struct {
 	styles     Styles
 	quitting   bool
 	paletteIdx int
+	// Provider picker overlay state (opened by /providers or /provider).
+	pickingProvider bool
+	providerIdx     int
 }
 
 type Styles struct {
@@ -48,7 +51,8 @@ type slashCmd struct {
 
 var slashCommands = []slashCmd{
 	{"/help", "Show all commands"},
-	{"/providers", "List configured LLM providers"},
+	{"/providers", "Pick the active LLM provider (interactive list)"},
+	{"/provider", "Switch provider directly (e.g. /provider groq)"},
 	{"/tools", "List available tools"},
 	{"/clear", "Clear conversation"},
 	{"/config", "Show current config"},
@@ -149,6 +153,35 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Provider picker overlay takes over keys while open.
+	if a.pickingProvider {
+		names := a.llmManager.ListProviders()
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			a.quitting = true
+			return a, tea.Quit
+		case tea.KeyEsc:
+			a.pickingProvider = false
+			return a, nil
+		case tea.KeyUp:
+			if len(names) > 0 {
+				a.providerIdx = (a.providerIdx - 1 + len(names)) % len(names)
+			}
+			return a, nil
+		case tea.KeyDown:
+			if len(names) > 0 {
+				a.providerIdx = (a.providerIdx + 1) % len(names)
+			}
+			return a, nil
+		case tea.KeyEnter:
+			a.chooseProvider()
+			return a, nil
+		}
+		// Any other key (typing, etc.) closes the picker and is
+		// handled normally below.
+		a.pickingProvider = false
+	}
+
 	matches := paletteMatches(a.input)
 
 	switch msg.Type {
@@ -274,8 +307,17 @@ func (a *App) handleCommand(input string) tea.Cmd {
 		}
 		a.addSystemMessage(strings.TrimRight(b.String(), "\n"))
 	case "/providers":
-		providers := a.llmManager.ListProviders()
-		a.addSystemMessage(fmt.Sprintf("Available providers: %s", strings.Join(providers, ", ")))
+		a.openProviderPicker()
+	case "/provider":
+		if len(parts) > 1 {
+			if err := a.llmManager.SetDefaultProvider(parts[1]); err != nil {
+				a.addSystemMessage(err.Error())
+			} else {
+				a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)", a.llmManager.DefaultProviderName(), a.llmManager.ProviderModel(parts[1])))
+			}
+		} else {
+			a.openProviderPicker()
+		}
 	case "/tools":
 		var toolNames []string
 		for _, t := range a.toolReg.List() {
@@ -285,7 +327,7 @@ func (a *App) handleCommand(input string) tea.Cmd {
 	case "/clear":
 		a.messages = []types.Message{}
 	case "/config":
-		a.addSystemMessage(fmt.Sprintf("Providers configured: %d, tools: %d (default: ollama)", len(a.llmManager.ListProviders()), len(a.toolReg.List())))
+		a.addSystemMessage(fmt.Sprintf("Active provider: %s, providers: %d, tools: %d", a.llmManager.DefaultProviderName(), len(a.llmManager.ListProviders()), len(a.toolReg.List())))
 	case "/update":
 		a.addSystemMessage("To self-update, exit chat and run: terbash update")
 	case "/exit", "/quit":
@@ -295,6 +337,43 @@ func (a *App) handleCommand(input string) tea.Cmd {
 		a.addSystemMessage(fmt.Sprintf("Unknown command: %s (type / for the list)", cmd))
 	}
 	return nil
+}
+
+// openProviderPicker shows the interactive provider list, preselecting
+// the currently active provider.
+func (a *App) openProviderPicker() {
+	names := a.llmManager.ListProviders()
+	a.providerIdx = 0
+	for i, n := range names {
+		if n == a.llmManager.DefaultProviderName() {
+			a.providerIdx = i
+			break
+		}
+	}
+	a.pickingProvider = true
+}
+
+// chooseProvider switches to the highlighted provider and closes the picker.
+func (a *App) chooseProvider() {
+	names := a.llmManager.ListProviders()
+	a.pickingProvider = false
+	if len(names) == 0 {
+		return
+	}
+	if a.providerIdx < 0 || a.providerIdx >= len(names) {
+		a.providerIdx = 0
+	}
+	name := names[a.providerIdx]
+	if err := a.llmManager.SetDefaultProvider(name); err != nil {
+		a.addSystemMessage(err.Error())
+		return
+	}
+	model := a.llmManager.ProviderModel(name)
+	if model != "" {
+		a.addSystemMessage(fmt.Sprintf("Switched provider to %s (model: %s)", name, model))
+	} else {
+		a.addSystemMessage(fmt.Sprintf("Switched provider to %s", name))
+	}
 }
 
 func (a *App) streamLLM() tea.Cmd {
@@ -389,6 +468,34 @@ func (a *App) View() string {
 	inputView := a.styles.Input.Render(a.input[:a.cursor] + " " + a.input[a.cursor:])
 	b.WriteString(inputView)
 	b.WriteString("\n")
+
+	// Provider picker overlay: selectable list under the input box.
+	if a.pickingProvider {
+		names := a.llmManager.ListProviders()
+		if a.providerIdx < 0 || (len(names) > 0 && a.providerIdx >= len(names)) {
+			a.providerIdx = 0
+		}
+		active := a.llmManager.DefaultProviderName()
+		for i, n := range names {
+			marker := "○"
+			if n == active {
+				marker = "●"
+			}
+			model := a.llmManager.ProviderModel(n)
+			line := fmt.Sprintf("  %s  %s", n, model)
+			if n == active {
+				line += "  (active)"
+			}
+			if i == a.providerIdx {
+				b.WriteString(a.styles.PaletteSel.Render("› "+marker+line))
+			} else {
+				b.WriteString(a.styles.PaletteNorm.Render("  "+marker+line))
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString(a.styles.Help.Render("↑↓: move • Enter: use provider • Esc: cancel"))
+		return b.String()
+	}
 
 	// "/" command palette: live-filtered list under the input box.
 	if matches := paletteMatches(a.input); len(matches) > 0 {

@@ -2,6 +2,7 @@ package llm
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/terbash/terbash/pkg/providers"
@@ -90,11 +91,39 @@ func (m *Manager) GetDefaultProvider() types.LLMProvider {
 	return m.providers[m.defaultProvider]
 }
 
+// DefaultProviderName returns the active provider's name.
+func (m *Manager) DefaultProviderName() string {
+	return string(m.defaultProvider)
+}
+
+// SetDefaultProvider switches the active provider for this session.
+func (m *Manager) SetDefaultProvider(name string) error {
+	p := types.Provider(strings.ToLower(strings.TrimSpace(name)))
+	if p == "" {
+		return fmt.Errorf("provider name is required")
+	}
+	if _, ok := m.providers[p]; !ok {
+		return fmt.Errorf("provider %s not available (use /providers to list)", p)
+	}
+	m.defaultProvider = p
+	return nil
+}
+
+// ProviderModel returns the configured model for a provider, or "".
+func (m *Manager) ProviderModel(name string) string {
+	p, err := m.GetProvider(name)
+	if err != nil {
+		return ""
+	}
+	return p.GetConfig().Model
+}
+
 func (m *Manager) ListProviders() []string {
 	names := make([]string, 0, len(m.providers))
 	for name := range m.providers {
 		names = append(names, string(name))
 	}
+	sort.Strings(names)
 	return names
 }
 
