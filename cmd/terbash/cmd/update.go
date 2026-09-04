@@ -28,7 +28,38 @@ releases and replace the currently running binary.
 
 All file paths are handled with spaces in mind (no shell string
 splitting - everything uses filepath + direct file I/O).`,
-	RunE: runUpdate,
+	RunE:         runUpdate,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+}
+
+// networkHint returns extra guidance when err looks like a local
+// network/DNS problem (e.g. Termux with no working resolver).
+func networkHint(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	for _, s := range []string{
+		"no such host", "lookup ", "connection refused",
+		"network is unreachable", "temporary failure",
+		"i/o timeout", "client.timeout",
+	} {
+		if strings.Contains(msg, s) {
+			return "Hint: this looks like a network/DNS problem on this device, not a terbash bug.\n" +
+				"Try: check internet/VPN, then run: getprop net.dns1\n" +
+				"If DNS is broken in Termux, fix resolvers with:\n" +
+				"  printf 'nameserver 8.8.8.8\\nnameserver 1.1.1.1\\n' > $PREFIX/etc/resolv.conf"
+		}
+	}
+	return ""
+}
+
+func downloadErr(op string, err error) error {
+	if h := networkHint(err); h != "" {
+		return fmt.Errorf("%s: %v\n%s", op, err, h)
+	}
+	return fmt.Errorf("%s: %w", op, err)
 }
 
 func init() {
@@ -128,7 +159,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
+		return downloadErr("download failed", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
@@ -147,7 +178,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	if _, err := io.Copy(tmp, resp.Body); err != nil {
 		tmp.Close()
-		return fmt.Errorf("download failed: %w", err)
+		return downloadErr("download failed", err)
 	}
 	if err := tmp.Close(); err != nil {
 		return err
