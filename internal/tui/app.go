@@ -67,6 +67,29 @@ var slashCommands = []slashCmd{
 	{"/exit", "Quit (also /quit, Ctrl+C)"},
 }
 
+// windowSelection returns the [start:end] row window of n items (at most
+// max rows) that keeps the selected index visible. Used by both pickers
+// so scrolling past the visible rows follows the highlight.
+func windowSelection(n, sel, max int) (int, int) {
+	if n <= max || max <= 0 {
+		return 0, n
+	}
+	if sel < 0 {
+		sel = 0
+	}
+	if sel >= n {
+		sel = n - 1
+	}
+	start := sel - max + 1
+	if start < 0 {
+		start = 0
+	}
+	if start > n-max {
+		start = n - max
+	}
+	return start, start + max
+}
+
 // paletteMatches returns slash commands matching the current input.
 // Typing "/" alone shows everything; "/pr" filters to /providers, etc.
 func paletteMatches(input string) []slashCmd {
@@ -577,8 +600,14 @@ func (a *App) View() string {
 		if a.providerIdx < 0 || (len(names) > 0 && a.providerIdx >= len(names)) {
 			a.providerIdx = 0
 		}
+		const maxShow = 8
+		start, end := windowSelection(len(names), a.providerIdx, maxShow)
+		if start > 0 {
+			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d above", start)))
+			b.WriteString("\n")
+		}
 		active := a.llmManager.DefaultProviderName()
-		for i, n := range names {
+		for i, n := range names[start:end] {
 			marker := "+"
 			if n == active {
 				marker = "●"
@@ -589,11 +618,15 @@ func (a *App) View() string {
 			if n == active {
 				line += "  (active)"
 			}
-			if i == a.providerIdx {
+			if start+i == a.providerIdx {
 				b.WriteString(a.styles.PaletteSel.Render("› "+marker+line))
 			} else {
 				b.WriteString(a.styles.PaletteNorm.Render("  "+marker+line))
 			}
+			b.WriteString("\n")
+		}
+		if end < len(names) {
+			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(names)-end)))
 			b.WriteString("\n")
 		}
 		b.WriteString(a.styles.Help.Render("↑↓jk: move • 1-9/Enter: use • Esc: cancel • ● active ○ ready + setup needed"))
@@ -606,21 +639,22 @@ func (a *App) View() string {
 			a.paletteIdx = 0
 		}
 		const maxShow = 8
-		shown := matches
-		if len(shown) > maxShow {
-			shown = shown[:maxShow]
+		start, end := windowSelection(len(matches), a.paletteIdx, maxShow)
+		if start > 0 {
+			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d above", start)))
+			b.WriteString("\n")
 		}
-		for i, c := range shown {
+		for i, c := range matches[start:end] {
 			line := fmt.Sprintf("  %s  %s", c.name, c.desc)
-			if i == a.paletteIdx {
+			if start+i == a.paletteIdx {
 				b.WriteString(a.styles.PaletteSel.Render("›"+line))
 			} else {
 				b.WriteString(a.styles.PaletteNorm.Render(" "+line))
 			}
 			b.WriteString("\n")
 		}
-		if len(matches) > maxShow {
-			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(matches)-maxShow)))
+		if end < len(matches) {
+			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(matches)-end)))
 			b.WriteString("\n")
 		}
 		b.WriteString(a.styles.Help.Render("↑↓jk: move • Tab/Enter: complete • Esc: close"))
