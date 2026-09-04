@@ -30,14 +30,15 @@ func NewManager(cfg *types.Config) (*Manager, error) {
 		m.providers[providerName] = p
 	}
 
-	if _, ok := m.providers[m.defaultProvider]; !ok && m.defaultProvider != types.ProviderOllama {
-		m.defaultProvider = types.ProviderOllama
-	}
-
+	// Ollama is always registered as a local fallback, but it must not
+	// hijack an explicitly configured default provider.
 	if _, ok := m.providers[types.ProviderOllama]; !ok {
 		m.providers[types.ProviderOllama] = providers.NewOllamaProvider(types.ProviderConfig{
 			Model: "llama3.2:3b",
 		})
+	}
+
+	if _, ok := m.providers[m.defaultProvider]; !ok {
 		m.defaultProvider = types.ProviderOllama
 	}
 
@@ -116,6 +117,11 @@ func (m *Manager) ProviderModel(name string) string {
 		return ""
 	}
 	return p.GetConfig().Model
+}
+
+// SetActiveModel switches the model of the active provider for this session.
+func (m *Manager) SetActiveModel(model string) {
+	m.GetDefaultProvider().SetModel(strings.TrimSpace(model))
 }
 
 func (m *Manager) ListProviders() []string {

@@ -110,3 +110,8 @@ func (p *BaseProvider) doStreamRequest(ctx context.Context, method, endpoint str
 func (p *BaseProvider) GetConfig() types.ProviderConfig {
 	return p.config
 }
+
+// SetModel switches the model for this session.
+func (p *BaseProvider) SetModel(model string) {
+	p.config.Model = model
+}

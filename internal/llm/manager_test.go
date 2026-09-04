@@ -28,6 +28,25 @@ func TestListProvidersSorted(t *testing.T) {
 	}
 }
 
+func TestExplicitDefaultNotHijackedByOllamaFallback(t *testing.T) {
+	cfg := &types.Config{
+		DefaultProvider: types.ProviderGroq,
+		Providers: map[types.Provider]types.ProviderConfig{
+			types.ProviderGroq: {Model: "llama-3.1-8b-instant"},
+		},
+	}
+	m, err := NewManager(cfg)
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	if m.DefaultProviderName() != "groq" {
+		t.Fatalf("expected default groq, got %s", m.DefaultProviderName())
+	}
+	if _, err := m.GetProvider("ollama"); err != nil {
+		t.Fatalf("ollama fallback should still be registered: %v", err)
+	}
+}
+
 func TestSetDefaultProvider(t *testing.T) {
 	m, err := NewManager(testConfig())
 	if err != nil {

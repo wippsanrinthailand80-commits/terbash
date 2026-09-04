@@ -123,6 +123,20 @@ export XAI_API_KEY="..."
 
 ## Usage
 
+### CLI commands
+```bash
+terbash                    # interactive chat
+terbash version            # version + platform
+terbash status             # provider, model, tools, config path
+terbash providers          # list providers (● = active)
+terbash models             # list models of active provider
+terbash models -p groq     # list models of a specific provider
+terbash config path        # print config file path
+terbash config init        # create default config if missing
+terbash config set-provider groq   # set default + scaffold entry
+terbash update             # self-update to latest release
+```
+
 ### Interactive TUI
 ```bash
 terbash
@@ -140,6 +154,9 @@ Commands:
 - `/help` - Show all commands
 - `/providers` - Open the provider picker (interactive list, pick one to switch)
 - `/provider <name>` - Switch provider directly, e.g. `/provider groq`
+- `/model [name]` - Show or switch model for this session
+- `/status` - Version, provider, model, counts
+- `/version` - Show terbash version
 - `/tools` - List available tools
 - `/clear` - Clear conversation
 - `/config` - Show active provider, provider/tool counts

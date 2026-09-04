@@ -54,6 +54,7 @@ func initConfig() {
 }
 
 func runInteractive() error {
+	tui.Version = Version
 	app := tui.NewApp(cfg)
 	return app.Run()
 }

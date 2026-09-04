@@ -12,6 +12,9 @@ import (
 	"github.com/terbash/terbash/pkg/types"
 )
 
+// Version is set by the CLI entrypoint (dev when built without ldflags).
+var Version = "dev"
+
 type App struct {
 	config     *types.Config
 	llmManager *llm.Manager
@@ -53,6 +56,9 @@ var slashCommands = []slashCmd{
 	{"/help", "Show all commands"},
 	{"/providers", "Pick the active LLM provider (interactive list)"},
 	{"/provider", "Switch provider directly (e.g. /provider groq)"},
+	{"/model", "Show or switch model (e.g. /model llama3.2:3b)"},
+	{"/status", "Show version, provider, model, counts"},
+	{"/version", "Show terbash version"},
 	{"/tools", "List available tools"},
 	{"/clear", "Clear conversation"},
 	{"/config", "Show current config"},
@@ -328,6 +334,19 @@ func (a *App) handleCommand(input string) tea.Cmd {
 		a.messages = []types.Message{}
 	case "/config":
 		a.addSystemMessage(fmt.Sprintf("Active provider: %s, providers: %d, tools: %d", a.llmManager.DefaultProviderName(), len(a.llmManager.ListProviders()), len(a.toolReg.List())))
+	case "/status":
+		active := a.llmManager.DefaultProviderName()
+		a.addSystemMessage(fmt.Sprintf("terbash %s\nprovider: %s (model: %s)\nproviders: %d, tools: %d", Version, active, a.llmManager.ProviderModel(active), len(a.llmManager.ListProviders()), len(a.toolReg.List())))
+	case "/version":
+		a.addSystemMessage(fmt.Sprintf("terbash %s", Version))
+	case "/model":
+		active := a.llmManager.DefaultProviderName()
+		if len(parts) > 1 {
+			a.llmManager.SetActiveModel(parts[1])
+			a.addSystemMessage(fmt.Sprintf("Model for %s set to %s (this session)", active, strings.TrimSpace(parts[1])))
+		} else {
+			a.addSystemMessage(fmt.Sprintf("Model for %s: %s (usage: /model <name>)", active, a.llmManager.ProviderModel(active)))
+		}
 	case "/update":
 		a.addSystemMessage("To self-update, exit chat and run: terbash update")
 	case "/exit", "/quit":

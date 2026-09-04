@@ -94,4 +94,5 @@ type LLMProvider interface {
 	GetModels() ([]string, error)
 	Close() error
 	GetConfig() ProviderConfig
+	SetModel(model string)
 }
