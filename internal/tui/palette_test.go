@@ -1,6 +1,11 @@
 package tui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/terbash/terbash/pkg/types"
+)
 
 func TestWindowSelection(t *testing.T) {
 	// Short list: everything visible.
@@ -31,5 +36,42 @@ func TestWindowSelection(t *testing.T) {
 	}
 	if s, e := windowSelection(13, -3, 8); s != 0 || e != 8 {
 		t.Fatalf("clamp low: got [%d:%d]", s, e)
+	}
+}
+
+func TestPaletteScrollRevealsHiddenCommands(t *testing.T) {
+	app := NewApp(&types.Config{})
+	app.input = "/"
+	app.cursor = 1
+	matches := paletteMatches("/")
+	if len(matches) <= 8 {
+		t.Fatalf("need >8 commands to test scrolling, got %d", len(matches))
+	}
+	// Park the highlight on the first hidden row, as if scrolled down.
+	app.paletteIdx = 8
+	view := app.View()
+	want := matches[8].name
+	if !strings.Contains(view, want) {
+		t.Fatalf("scrolled-to command %q missing from view:\n%s", want, view)
+	}
+	if !strings.Contains(view, "›") {
+		t.Fatal("no highlight marker rendered for scrolled selection")
+	}
+}
+
+func TestProviderPickerScrollRevealsHidden(t *testing.T) {
+	app := NewApp(&types.Config{})
+	app.openProviderPicker()
+	names := app.llmManager.AllProviderNames()
+	if len(names) <= 8 {
+		t.Fatalf("need >8 providers to test scrolling, got %d", len(names))
+	}
+	app.providerIdx = len(names) - 1 // scroll to the very bottom
+	view := app.View()
+	if !strings.Contains(view, names[len(names)-1]) {
+		t.Fatalf("bottom provider %q missing from view", names[len(names)-1])
+	}
+	if !strings.Contains(view, "›") {
+		t.Fatal("no highlight marker rendered for scrolled selection")
 	}
 }
