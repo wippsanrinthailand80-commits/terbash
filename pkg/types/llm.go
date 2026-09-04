@@ -37,9 +37,10 @@ type ToolSchema struct {
 }
 
 type Property struct {
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Enum        []string `json:"enum,omitempty"`
+	Type        string     `json:"type"`
+	Description string     `json:"description"`
+	Enum        []string   `json:"enum,omitempty"`
+	Items       *Property  `json:"items,omitempty"`
 }
 
 type ChatCompletionRequest struct {
@@ -87,9 +88,10 @@ type StreamChoice struct {
 	FinishReason string  `json:"finish_reason"`
 }
 
-type Provider interface {
+type LLMProvider interface {
 	ChatCompletion(req ChatCompletionRequest) (*ChatCompletionResponse, error)
 	ChatCompletionStream(req ChatCompletionRequest) (<-chan StreamChunk, error)
 	GetModels() ([]string, error)
 	Close() error
+	GetConfig() ProviderConfig
 }

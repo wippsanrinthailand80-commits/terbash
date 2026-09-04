@@ -161,6 +161,10 @@ func (p *AnthropicProvider) Close() error {
 	return nil
 }
 
+func (p *AnthropicProvider) GetConfig() types.ProviderConfig {
+	return p.BaseProvider.GetConfig()
+}
+
 func (p *AnthropicProvider) convertRequest(req types.ChatCompletionRequest) map[string]interface{} {
 	messages := make([]map[string]interface{}, 0, len(req.Messages))
 	var systemPrompt string

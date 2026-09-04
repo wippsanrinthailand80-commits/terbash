@@ -1,22 +1,22 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/terbash/terbash/internal/config"
 	"github.com/terbash/terbash/pkg/types"
 )
 
 type ShellTool struct {
-	config *config.Config
+	config *types.Config
 	cwd    string
 }
 
-func NewShellTool(cfg *config.Config, cwd string) *ShellTool {
+func NewShellTool(cfg *types.Config, cwd string) *ShellTool {
 	return &ShellTool{config: cfg, cwd: cwd}
 }
 

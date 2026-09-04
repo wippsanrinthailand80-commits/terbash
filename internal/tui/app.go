@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/terbash/terbash/internal/config"
 	"github.com/terbash/terbash/internal/llm"
 	"github.com/terbash/terbash/internal/tools"
 	"github.com/terbash/terbash/pkg/types"
@@ -183,7 +182,7 @@ func (a *App) streamLLM() tea.Cmd {
 	return func() tea.Msg {
 		provider := a.llmManager.GetDefaultProvider()
 		tools := a.toolReg.GetSchemas()
-		var toolSchemas []types.Tool
+		var toolSchemas []types.ToolInterface
 		for _, t := range tools {
 			toolSchemas = append(toolSchemas, t)
 		}
@@ -206,7 +205,7 @@ func (a *App) streamLLM() tea.Cmd {
 	}
 }
 
-func (a *App) convertTools(tools []types.Tool) []types.Tool {
+func (a *App) convertTools(tools []types.ToolInterface) []types.Tool {
 	var result []types.Tool
 	for _, t := range tools {
 		result = append(result, types.Tool{

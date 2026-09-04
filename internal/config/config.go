@@ -43,7 +43,7 @@ func Load(configFile string) (*types.Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err := Validate(cfg); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
@@ -62,7 +62,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("godot.binary_path", "godot")
 }
 
-func (c *types.Config) Validate() error {
+func Validate(c *types.Config) error {
 	if c.DefaultProvider == "" {
 		c.DefaultProvider = types.ProviderOllama
 	}

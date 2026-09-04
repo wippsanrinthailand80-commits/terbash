@@ -9,16 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/terbash/terbash/internal/config"
 	"github.com/terbash/terbash/pkg/types"
 )
 
 type GodotTool struct {
-	config *config.Config
+	config *types.Config
 	cwd    string
 }
 
-func NewGodotTool(cfg *config.Config, cwd string) *GodotTool {
+func NewGodotTool(cfg *types.Config, cwd string) *GodotTool {
 	return &GodotTool{config: cfg, cwd: cwd}
 }
 

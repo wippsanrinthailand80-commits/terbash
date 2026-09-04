@@ -125,10 +125,3 @@ func (t *TermuxTool) Execute(args map[string]interface{}) (*types.ToolResult, er
 		Metadata: map[string]string{"operation": op},
 	}, nil
 }
-
-func errToString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}

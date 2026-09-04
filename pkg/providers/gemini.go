@@ -183,6 +183,10 @@ func (p *GeminiProvider) Close() error {
 	return nil
 }
 
+func (p *GeminiProvider) GetConfig() types.ProviderConfig {
+	return p.BaseProvider.GetConfig()
+}
+
 type FunctionCall struct {
 	Name string                 `json:"name"`
 	Args map[string]interface{} `json:"args"`

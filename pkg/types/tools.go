@@ -7,7 +7,7 @@ type ToolResult struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-type Tool interface {
+type ToolInterface interface {
 	Name() string
 	Description() string
 	Schema() ToolSchema
@@ -16,6 +16,6 @@ type Tool interface {
 
 type ToolExecutor interface {
 	ExecuteTool(name string, args map[string]interface{}) (*ToolResult, error)
-	ListTools() []Tool
-	GetTool(name string) Tool
+	ListTools() []ToolInterface
+	GetTool(name string) ToolInterface
 }

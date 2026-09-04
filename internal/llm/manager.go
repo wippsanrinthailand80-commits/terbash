@@ -4,20 +4,19 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/terbash/terbash/internal/config"
 	"github.com/terbash/terbash/pkg/providers"
 	"github.com/terbash/terbash/pkg/types"
 )
 
 type Manager struct {
-	providers       map[types.Provider]types.Provider
+	providers       map[types.Provider]types.LLMProvider
 	defaultProvider types.Provider
 	config          *types.Config
 }
 
 func NewManager(cfg *types.Config) (*Manager, error) {
 	m := &Manager{
-		providers:       make(map[types.Provider]types.Provider),
+		providers:       make(map[types.Provider]types.LLMProvider),
 		defaultProvider: cfg.DefaultProvider,
 		config:          cfg,
 	}
@@ -44,7 +43,7 @@ func NewManager(cfg *types.Config) (*Manager, error) {
 	return m, nil
 }
 
-func (m *Manager) createProvider(name types.Provider, cfg types.ProviderConfig) (types.Provider, error) {
+func (m *Manager) createProvider(name types.Provider, cfg types.ProviderConfig) (types.LLMProvider, error) {
 	switch name {
 	case types.ProviderOpenAI:
 		return providers.NewOpenAIProvider(cfg), nil
@@ -75,7 +74,7 @@ func (m *Manager) createProvider(name types.Provider, cfg types.ProviderConfig) 
 	}
 }
 
-func (m *Manager) GetProvider(name string) (types.Provider, error) {
+func (m *Manager) GetProvider(name string) (types.LLMProvider, error) {
 	provider := types.Provider(strings.ToLower(name))
 	if provider == "" {
 		provider = m.defaultProvider
@@ -87,7 +86,7 @@ func (m *Manager) GetProvider(name string) (types.Provider, error) {
 	return p, nil
 }
 
-func (m *Manager) GetDefaultProvider() types.Provider {
+func (m *Manager) GetDefaultProvider() types.LLMProvider {
 	return m.providers[m.defaultProvider]
 }
 

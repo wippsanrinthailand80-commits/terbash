@@ -6,16 +6,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/terbash/terbash/internal/config"
 	"github.com/terbash/terbash/pkg/types"
 )
 
 type FileTool struct {
-	config *config.Config
+	config *types.Config
 	cwd    string
 }
 
-func NewFileTool(cfg *config.Config, cwd string) *FileTool {
+func NewFileTool(cfg *types.Config, cwd string) *FileTool {
 	return &FileTool{config: cfg, cwd: cwd}
 }
 

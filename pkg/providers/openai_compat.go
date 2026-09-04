@@ -102,6 +102,10 @@ func (p *OpenAICompatibleProvider) Close() error {
 	return nil
 }
 
+func (p *OpenAICompatibleProvider) GetConfig() types.ProviderConfig {
+	return p.BaseProvider.GetConfig()
+}
+
 func NewOpenAIProvider(config types.ProviderConfig) *OpenAICompatibleProvider {
 	return NewOpenAICompatibleProvider(config, "https://api.openai.com/v1")
 }

@@ -143,3 +143,7 @@ func (p *OllamaProvider) GetModels() ([]string, error) {
 func (p *OllamaProvider) Close() error {
 	return nil
 }
+
+func (p *OllamaProvider) GetConfig() types.ProviderConfig {
+	return p.BaseProvider.GetConfig()
+}
