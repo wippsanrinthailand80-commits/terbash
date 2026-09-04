@@ -128,16 +128,16 @@ providers:
     model: "kimi-k3"
   novita:
     api_key: "..."     # or NOVITA_API_KEY
-    model: "meta-llama/llama-3.1-8b-instruct"
+    model: "deepseek/deepseek-v4-pro"
   siliconflow:
     api_key: "..."     # or SILICONFLOW_API_KEY
-    model: "Qwen/Qwen3-8B"
+    model: "zai-org/GLM-5.1"
   zhipu:
     api_key: "..."     # or ZAI_API_KEY
-    model: "glm-4-flash"
+    model: "glm-5.3"
   qwen:
     api_key: "..."     # or DASHSCOPE_API_KEY
-    model: "qwen-plus"
+    model: "qwen3.8-max"
     # base_url override per region, e.g. Beijing:
     # base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   ollama:

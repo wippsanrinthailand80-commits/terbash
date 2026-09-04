@@ -105,10 +105,10 @@ func DefaultModel(name Provider) (string, bool) {
 		ProviderFireworks:   "accounts/fireworks/models/llama-v3p1-8b-instruct",
 		ProviderDeepInfra:   "meta-llama/Meta-Llama-3.1-8B-Instruct",
 		ProviderMoonshot:    "kimi-k3",
-		ProviderNovita:      "meta-llama/llama-3.1-8b-instruct",
-		ProviderSiliconFlow: "Qwen/Qwen3-8B",
-		ProviderZhipu:       "glm-4-flash",
-		ProviderQwen:        "qwen-plus",
+		ProviderNovita:      "deepseek/deepseek-v4-pro",
+		ProviderSiliconFlow: "zai-org/GLM-5.1",
+		ProviderZhipu:       "glm-5.3",
+		ProviderQwen:        "qwen3.8-max",
 	}
 	m, ok := models[name]
 	return m, ok

@@ -226,3 +226,23 @@ func TestProviderCatalogComplete(t *testing.T) {
 		t.Fatalf("expected 23 supported providers, got %d", n)
 	}
 }
+
+// TestChineseProviderDefaultsAreCurrent pins the default model of every
+// Chinese provider to a verified-current flagship. Model IDs rot fast -
+// when this test fails, check the provider docs and update deliberately.
+func TestChineseProviderDefaultsAreCurrent(t *testing.T) {
+	want := map[types.Provider]string{
+		types.ProviderMoonshot:    "kimi-k3",
+		types.ProviderDeepSeek:    "deepseek-chat", // evergreen alias, always latest
+		types.ProviderNovita:      "deepseek/deepseek-v4-pro",
+		types.ProviderSiliconFlow: "zai-org/GLM-5.1",
+		types.ProviderZhipu:       "glm-5.3",
+		types.ProviderQwen:        "qwen3.8-max",
+	}
+	for p, id := range want {
+		got, ok := types.DefaultModel(p)
+		if !ok || got != id {
+			t.Errorf("%s: default %q, want %q", p, got, id)
+		}
+	}
+}
