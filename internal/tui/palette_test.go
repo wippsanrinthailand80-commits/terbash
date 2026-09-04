@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/charmbracelet/lipgloss"
 	"strings"
 	"testing"
 
@@ -73,5 +74,28 @@ func TestProviderPickerScrollRevealsHidden(t *testing.T) {
 	}
 	if !strings.Contains(view, "›") {
 		t.Fatal("no highlight marker rendered for scrolled selection")
+	}
+}
+
+func TestBottomBarPinsVersionRight(t *testing.T) {
+	app := NewApp(&types.Config{})
+	app.termWidth = 40
+	line := app.bottomBar("hi")
+	stripped := strings.ReplaceAll(line, "\x1b", "")
+	_ = stripped
+	// Styled output: check visual width fills the terminal and ends with version.
+	if w := lipgloss.Width(line); w != 40 {
+		t.Fatalf("bottom bar width %d, want 40: %q", w, line)
+	}
+	if !strings.HasSuffix(strings.TrimRight(line, " "), "terbash dev") {
+		t.Fatalf("version not at right edge: %q", line)
+	}
+}
+
+func TestBottomBarFallbackWithoutWidth(t *testing.T) {
+	app := NewApp(&types.Config{})
+	line := app.bottomBar("hi")
+	if !strings.Contains(line, "hi • terbash dev") {
+		t.Fatalf("fallback should inline version: %q", line)
 	}
 }

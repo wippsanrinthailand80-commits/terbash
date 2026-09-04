@@ -55,7 +55,7 @@ func initConfig() {
 
 func runInteractive() error {
 	tui.Version = Version
-	// cfg is loaded by PersistentPreRunE. Plain-terminal prompt here -
+	// cfg is loaded by PersistentPreRunE. Plain-terminal prompts here -
 	// the fullscreen TUI cannot do hidden input well.
 	quit, err := ensureAPIKey(cfg)
 	if err != nil {
@@ -65,6 +65,11 @@ func runInteractive() error {
 		fmt.Println("Goodbye!")
 		return nil
 	}
+	pendingReminder := autoUpdateOnLogin()
 	app := tui.NewApp(cfg)
-	return app.Run()
+	runErr := app.Run()
+	if pendingReminder != "" {
+		fmt.Printf("Update available: %s — run `terbash update` (or `terbash update -y`).\n", pendingReminder)
+	}
+	return runErr
 }

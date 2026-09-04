@@ -179,6 +179,24 @@ func (m *Manager) SetActiveModel(model string) {
 	m.GetDefaultProvider().SetModel(strings.TrimSpace(model))
 }
 
+// SetProviderAPIKey updates a provider's key both in memory (live,
+// no restart) and in the returned entry for callers to persist.
+func (m *Manager) SetProviderAPIKey(name, key string) error {
+	p := types.Provider(strings.ToLower(strings.TrimSpace(name)))
+	prov, ok := m.providers[p]
+	if !ok {
+		return fmt.Errorf("provider %s not available (use /providers to list)", p)
+	}
+	prov.SetAPIKey(key)
+	entry := m.config.Providers[p]
+	entry.APIKey = key
+	if m.config.Providers == nil {
+		m.config.Providers = make(map[types.Provider]types.ProviderConfig)
+	}
+	m.config.Providers[p] = entry
+	return nil
+}
+
 func (m *Manager) ListProviders() []string {
 	names := make([]string, 0, len(m.providers))
 	for name := range m.providers {

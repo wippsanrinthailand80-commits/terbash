@@ -95,4 +95,5 @@ type LLMProvider interface {
 	Close() error
 	GetConfig() ProviderConfig
 	SetModel(model string)
+	SetAPIKey(key string)
 }

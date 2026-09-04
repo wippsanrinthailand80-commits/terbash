@@ -143,6 +143,30 @@ func TestEffectiveAPIKey(t *testing.T) {
 	}
 }
 
+func TestSetProviderAPIKeyLive(t *testing.T) {
+	m, err := NewManager(&types.Config{
+		DefaultProvider: types.ProviderGroq,
+		Providers: map[types.Provider]types.ProviderConfig{
+			types.ProviderGroq: {Model: "m"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	if err := m.SetProviderAPIKey("groq", "sk-live"); err != nil {
+		t.Fatalf("SetProviderAPIKey: %v", err)
+	}
+	if got := m.EffectiveAPIKey("groq"); got != "sk-live" {
+		t.Fatalf("live key not applied: %q", got)
+	}
+	if got := m.GetDefaultProvider().GetConfig().APIKey; got != "sk-live" {
+		t.Fatalf("provider instance not updated: %q", got)
+	}
+	if err := m.SetProviderAPIKey("nope", "x"); err == nil {
+		t.Fatal("expected error for unknown provider")
+	}
+}
+
 func TestSetDefaultProvider(t *testing.T) {
 	m, err := NewManager(testConfig())
 	if err != nil {

@@ -37,6 +37,13 @@ type App struct {
 	// Provider picker overlay state (opened by /providers or /provider).
 	pickingProvider bool
 	providerIdx     int
+	// Model picker overlay state (opened by /models).
+	pickingModel bool
+	loadingModel bool
+	modelReq     int
+	modelNames   []string
+	modelIdx     int
+	modelFor     string
 	// Agentic tool-loop state for the current user message.
 	streamCh      <-chan types.StreamChunk
 	toolIter      int
@@ -44,6 +51,8 @@ type App struct {
 	fragTools     []*toolFrag
 	confirmCall   *types.ToolCall
 	confirmPrompt string
+	// Terminal size for the bottom status bar (from WindowSizeMsg).
+	termWidth int
 }
 
 // toolFrag accumulates one streamed tool call. Providers send arguments
@@ -113,8 +122,23 @@ type Styles struct {
 	Input      lipgloss.Style
 	Cursor     lipgloss.Style
 	Help       lipgloss.Style
+	Version    lipgloss.Style
 	PaletteSel lipgloss.Style
 	PaletteNorm lipgloss.Style
+}
+
+// bottomBar renders the hint left-aligned with the version pinned to the
+// bottom-right corner. Falls back to inline when the width is unknown.
+func (a *App) bottomBar(hint string) string {
+	ver := "terbash " + Version
+	if a.termWidth <= 0 {
+		return a.styles.Help.Render(hint + " • " + ver)
+	}
+	gap := a.termWidth - lipgloss.Width(hint) - lipgloss.Width(ver)
+	if gap < 1 {
+		return a.styles.Help.Render(hint + " • " + ver)
+	}
+	return a.styles.Help.Render(hint) + strings.Repeat(" ", gap) + a.styles.Version.Render(ver)
 }
 
 // slashCmd describes one "/" command shown in the palette.
@@ -128,6 +152,8 @@ var slashCommands = []slashCmd{
 	{"/providers", "Pick the active LLM provider (interactive list)"},
 	{"/provider", "Switch provider directly (e.g. /provider groq)"},
 	{"/model", "Show or switch model (e.g. /model llama3.2:3b)"},
+	{"/models", "Pick a model from a list"},
+	{"/key", "Show key status or save one (/key groq sk-...)"},
 	{"/status", "Show version, provider, model, counts"},
 	{"/version", "Show terbash version"},
 	{"/tools", "List available tools"},
@@ -230,6 +256,8 @@ func defaultStyles() Styles {
 	Help: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
 		Italic(true),
+	Version: lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")),
 	PaletteSel: lipgloss.NewStyle().
 		Foreground(lipgloss.Color("0")).
 		Background(lipgloss.Color("62")).
@@ -250,6 +278,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return a.handleKey(msg)
 	case tea.WindowSizeMsg:
+		a.termWidth = msg.Width
 		return a, nil
 	case waitChunkMsg:
 		return a, waitForChunk(msg.stream)
@@ -266,6 +295,29 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case toolResultMsg:
 		return a.handleToolResult(msg)
+	case modelsMsg:
+		if msg.req != a.modelReq {
+			return a, nil // superseded (user cancelled or re-ran /models)
+		}
+		a.loadingModel = false
+		if msg.err != nil {
+			a.addSystemMessage(fmt.Sprintf("Could not list models for %s: %v", a.modelFor, msg.err))
+			return a, nil
+		}
+		if len(msg.models) == 0 {
+			a.addSystemMessage(fmt.Sprintf("No models reported by %s.", a.modelFor))
+			return a, nil
+		}
+		a.modelNames = msg.models
+		a.modelIdx = 0
+		for i, m := range msg.models {
+			if m == a.llmManager.ProviderModel(a.modelFor) {
+				a.modelIdx = i
+				break
+			}
+		}
+		a.pickingModel = true
+		return a, nil
 	}
 	return a, nil
 }
@@ -298,6 +350,51 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		default:
 			return a, nil
 		}
+	}
+
+	// Model picker overlay: same keyboard scheme as the provider picker.
+	if a.pickingModel {
+		n := len(a.modelNames)
+		move := func(delta int) {
+			if n > 0 {
+				a.modelIdx = (a.modelIdx + delta + n) % n
+			}
+		}
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			a.quitting = true
+			return a, tea.Quit
+		case tea.KeyEsc:
+			a.pickingModel = false
+			return a, nil
+		case tea.KeyUp, tea.KeyCtrlP:
+			move(-1)
+			return a, nil
+		case tea.KeyDown, tea.KeyCtrlN:
+			move(1)
+			return a, nil
+		case tea.KeyEnter:
+			a.chooseModel()
+			return a, nil
+		case tea.KeyRunes, tea.KeySpace:
+			if len(msg.Runes) == 1 {
+				switch r := msg.Runes[0]; {
+				case r == 'k':
+					move(-1)
+					return a, nil
+				case r == 'j':
+					move(1)
+					return a, nil
+				case r >= '1' && r <= '9':
+					if idx := int(r - '1'); idx < n {
+						a.modelIdx = idx
+						a.chooseModel()
+					}
+					return a, nil
+				}
+			}
+		}
+		a.pickingModel = false
 	}
 
 	// Provider picker overlay takes over keys while open.
@@ -356,6 +453,13 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.quitting = true
 		return a, tea.Quit
 	case tea.KeyEsc:
+		// A pending model fetch is cancelled first (its late reply is
+		// ignored via the request generation counter).
+		if a.loadingModel {
+			a.loadingModel = false
+			a.modelReq++
+			return a, nil
+		}
 		// If the "/" palette is open, Esc closes it instead of quitting.
 		if len(matches) > 0 {
 			a.input = ""
@@ -474,6 +578,9 @@ func (a *App) processInput() tea.Cmd {
 	a.pendingCalls = nil
 	a.fragTools = nil
 	a.confirmCall = nil
+	a.pickingModel = false
+	a.loadingModel = false
+	a.modelReq++
 
 	return a.streamLLM()
 }
@@ -540,8 +647,12 @@ func (a *App) handleCommand(input string) tea.Cmd {
 			a.llmManager.SetActiveModel(parts[1])
 			a.addSystemMessage(fmt.Sprintf("Model for %s set to %s (this session)", active, strings.TrimSpace(parts[1])))
 		} else {
-			a.addSystemMessage(fmt.Sprintf("Model for %s: %s (usage: /model <name>)", active, a.llmManager.ProviderModel(active)))
+			a.addSystemMessage(fmt.Sprintf("Model for %s: %s (usage: /model <name>, or /models to pick)", active, a.llmManager.ProviderModel(active)))
 		}
+	case "/models":
+		return a.openModelPicker()
+	case "/key":
+		a.handleKeyCommand(parts)
 	case "/update":
 		a.addSystemMessage("To self-update, exit chat and run: terbash update")
 	case "/exit", "/quit":
@@ -551,6 +662,82 @@ func (a *App) handleCommand(input string) tea.Cmd {
 		a.addSystemMessage(fmt.Sprintf("Unknown command: %s (type / for the list)", cmd))
 	}
 	return nil
+}
+
+// handleKeyCommand implements /key: with "<provider> <api-key>" it saves
+// the key (live, no restart); bare "/key" lists which providers have one.
+// Values are never printed - only set/missing.
+func (a *App) handleKeyCommand(parts []string) {
+	if len(parts) >= 3 {
+		name := strings.ToLower(strings.TrimSpace(parts[1]))
+		key := strings.TrimSpace(strings.Join(parts[2:], ""))
+		if key == "" {
+			a.addSystemMessage("API key must not be empty.")
+			return
+		}
+		if err := a.llmManager.SetProviderAPIKey(name, key); err != nil {
+			a.addSystemMessage(err.Error())
+			return
+		}
+		if path, err := config.GetConfigPath(); err == nil {
+			_ = config.SetProviderAPIKey(path, types.Provider(name), key)
+		}
+		a.addSystemMessage(fmt.Sprintf("API key for %s saved and active.", name))
+		return
+	}
+	if len(parts) == 2 {
+		a.addSystemMessage("Usage: /key <provider> <api-key>  (key is applied immediately)")
+		return
+	}
+	var b strings.Builder
+	b.WriteString("API keys (values never shown):\n")
+	for _, n := range a.llmManager.AllProviderNames() {
+		p := types.Provider(n)
+		if !types.RequiresKey(p) {
+			fmt.Fprintf(&b, "  %s - local, no key needed\n", n)
+			continue
+		}
+		status := "missing"
+		if a.llmManager.EffectiveAPIKey(n) != "" {
+			status = "set"
+		}
+		fmt.Fprintf(&b, "  %s - %s\n", n, status)
+	}
+	a.addSystemMessage(strings.TrimRight(b.String(), "\n"))
+}
+
+// openModelPicker fetches the active provider's models in the background
+// and opens the picker when they arrive.
+func (a *App) openModelPicker() tea.Cmd {
+	a.pickingModel = false
+	a.loadingModel = true
+	a.modelReq++
+	req := a.modelReq
+	a.modelNames = nil
+	a.modelIdx = 0
+	a.modelFor = a.llmManager.DefaultProviderName()
+	return func() tea.Msg {
+		p, err := a.llmManager.GetProvider(a.modelFor)
+		if err != nil {
+			return modelsMsg{req: req, err: err}
+		}
+		models, err := p.GetModels()
+		return modelsMsg{req: req, models: models, err: err}
+	}
+}
+
+// chooseModel applies the highlighted model to the active provider.
+func (a *App) chooseModel() {
+	a.pickingModel = false
+	if len(a.modelNames) == 0 {
+		return
+	}
+	if a.modelIdx < 0 || a.modelIdx >= len(a.modelNames) {
+		a.modelIdx = 0
+	}
+	name := a.modelNames[a.modelIdx]
+	a.llmManager.SetActiveModel(name)
+	a.addSystemMessage(fmt.Sprintf("Model for %s set to %s (this session)", a.modelFor, name))
 }
 
 // openProviderPicker shows every selectable provider (configured plus all
@@ -867,6 +1054,47 @@ func (a *App) View() string {
 	b.WriteString(inputView)
 	b.WriteString("\n")
 
+	// Model loading indicator while the provider is queried.
+	if a.loadingModel {
+		b.WriteString(a.styles.ToolMsg.Render(fmt.Sprintf("… loading models for %s", a.modelFor)))
+		b.WriteString("\n")
+		b.WriteString(a.bottomBar("Esc: cancel"))
+		return b.String()
+	}
+
+	// Model picker overlay under the input box.
+	if a.pickingModel {
+		names := a.modelNames
+		if a.modelIdx < 0 || (len(names) > 0 && a.modelIdx >= len(names)) {
+			a.modelIdx = 0
+		}
+		const maxShow = 8
+		start, end := windowSelection(len(names), a.modelIdx, maxShow)
+		if start > 0 {
+			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d above", start)))
+			b.WriteString("\n")
+		}
+		current := a.llmManager.ProviderModel(a.modelFor)
+		for i, m := range names[start:end] {
+			line := "  " + m
+			if m == current {
+				line += "  (active)"
+			}
+			if start+i == a.modelIdx {
+				b.WriteString(a.styles.PaletteSel.Render("›" + line))
+			} else {
+				b.WriteString(a.styles.PaletteNorm.Render(" " + line))
+			}
+			b.WriteString("\n")
+		}
+		if end < len(names) {
+			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(names)-end)))
+			b.WriteString("\n")
+		}
+		b.WriteString(a.bottomBar(fmt.Sprintf("Models for %s • ↑↓jk: move • 1-9/Enter: use • Esc: cancel", a.modelFor)))
+		return b.String()
+	}
+
 	// Provider picker overlay: every selectable provider under the input.
 	if a.pickingProvider {
 		names := a.llmManager.AllProviderNames()
@@ -902,7 +1130,7 @@ func (a *App) View() string {
 			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(names)-end)))
 			b.WriteString("\n")
 		}
-		b.WriteString(a.styles.Help.Render("↑↓jk: move • 1-9/Enter: use • Esc: cancel • ● active ○ ready + setup needed"))
+		b.WriteString(a.bottomBar("↑↓jk: move • 1-9/Enter: use • Esc: cancel • ● active ○ ready + setup needed"))
 		return b.String()
 	}
 
@@ -930,9 +1158,9 @@ func (a *App) View() string {
 			b.WriteString(a.styles.PaletteNorm.Render(fmt.Sprintf("  … +%d more", len(matches)-end)))
 			b.WriteString("\n")
 		}
-		b.WriteString(a.styles.Help.Render("↑↓jk: move • Tab/Enter: complete • Esc: close"))
+		b.WriteString(a.bottomBar("↑↓jk: move • Tab/Enter: complete • Esc: close"))
 	} else {
-		b.WriteString(a.styles.Help.Render("Enter: send • Ctrl+C: quit • /: commands"))
+		b.WriteString(a.bottomBar("Enter: send • Ctrl+C: quit • /: commands"))
 	}
 
 	return b.String()
@@ -956,6 +1184,12 @@ type streamErrorMsg struct {
 type toolResultMsg struct {
 	call   types.ToolCall
 	result *types.ToolResult
+}
+
+type modelsMsg struct {
+	req    int
+	models []string
+	err    error
 }
 
 func (a *App) Run() error {

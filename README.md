@@ -39,6 +39,10 @@ make build-arm64  # or make build for current platform
 ```
 
 ### Update
+Chat checks GitHub for a newer release on start: accept and it downloads,
+installs (`.bak` kept) and restarts straight into the new version; decline
+and you get a reminder at logout instead. Offline failures are silent.
+
 ```bash
 terbash update            # download latest release and replace binary (asks first)
 terbash update -y         # update without confirmation
@@ -156,7 +160,8 @@ export XAI_API_KEY="..."
 
 ### CLI commands
 ```bash
-terbash                    # interactive chat
+terbash                    # interactive chat (checks for updates on start)
+TERBASH_NO_AUTOUPDATE=1 terbash   # skip the startup update check
 terbash version            # version + platform
 terbash status             # provider, model, tools, config path
 terbash providers          # list providers (● = active)
@@ -195,6 +200,9 @@ Commands:
 - `/providers` - Open the provider picker (interactive list, pick one to switch)
 - `/provider <name>` - Switch provider directly, e.g. `/provider groq`
 - `/model [name]` - Show or switch model for this session
+- `/models` - Pick a model from the provider's list (↑↓jk, Enter, Esc)
+- `/key` - Key status per provider (values never shown)
+- `/key <provider> <api-key>` - Save a key, live immediately, no restart
 - `/status` - Version, provider, model, counts
 - `/version` - Show terbash version
 - `/tools` - List available tools

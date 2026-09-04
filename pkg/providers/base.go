@@ -115,3 +115,8 @@ func (p *BaseProvider) GetConfig() types.ProviderConfig {
 func (p *BaseProvider) SetModel(model string) {
 	p.config.Model = model
 }
+
+// SetAPIKey switches the API key for this session.
+func (p *BaseProvider) SetAPIKey(key string) {
+	p.config.APIKey = key
+}

@@ -231,7 +231,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Detected: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Printf("Downloading from: %s\n", url)
 
-	if !updateYes {
+	return downloadAndInstall(url, exe, updateYes)
+}
+
+// downloadAndInstall fetches url over exe with .bak safety. Shared by the
+// update command and the login-time auto-update.
+func downloadAndInstall(url, exe string, assumeYes bool) error {
+	if !assumeYes {
 		fmt.Printf("Replace %s? (previous binary kept as %s.bak) [y/N]: ", exe, exe)
 		var confirm string
 		if _, err := fmt.Scanln(&confirm); err != nil {
