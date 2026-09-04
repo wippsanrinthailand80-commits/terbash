@@ -1,10 +1,11 @@
 package tui
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/terbash/terbash/pkg/types"
 )
 
@@ -97,5 +98,74 @@ func TestBottomBarFallbackWithoutWidth(t *testing.T) {
 	line := app.bottomBar("hi")
 	if !strings.Contains(line, "hi • terbash dev") {
 		t.Fatalf("fallback should inline version: %q", line)
+	}
+}
+
+func TestFinishStreamRecordsMeta(t *testing.T) {
+	app := NewApp(&types.Config{})
+	app.streaming = true
+	app.toolIter = 1
+	app.msgStart = time.Now().Add(-1500 * time.Millisecond)
+	app.streamBuf.WriteString("hello")
+	app.fragTools = []*toolFrag{{id: "c1", name: "grep_search"}}
+	app.fragTools[0].args.WriteString("{}")
+
+	app.finishStream()
+
+	if len(app.messages) != 1 {
+		t.Fatalf("messages: %+v", app.messages)
+	}
+	m, ok := app.msgMeta[0]
+	if !ok {
+		t.Fatal("no meta recorded")
+	}
+	if m.seconds < 1.0 {
+		t.Fatalf("seconds too small: %v", m.seconds)
+	}
+	if len(m.tools) != 1 || m.tools[0] != "grep_search" {
+		t.Fatalf("tools: %v", m.tools)
+	}
+	if !app.streaming {
+		t.Fatal("tool loop should continue (streaming must stay on)")
+	}
+	if len(app.pendingCalls) != 0 {
+		t.Fatal("dispatched call should leave the queue")
+	}
+}
+
+func TestFinishStreamPlainAnswerMeta(t *testing.T) {
+	app := NewApp(&types.Config{})
+	app.streaming = true
+	app.toolIter = 1
+	app.msgStart = time.Now()
+	app.streamBuf.WriteString("hi")
+
+	app.finishStream()
+
+	m, ok := app.msgMeta[0]
+	if !ok {
+		t.Fatal("no meta recorded")
+	}
+	if got := formatReplyMeta(m); !strings.Contains(got, "answer") || !strings.Contains(got, "s") {
+		t.Fatalf("meta line: %q", got)
+	}
+	if app.streaming {
+		t.Fatal("plain answer should end the turn")
+	}
+	view := app.View()
+	if !strings.Contains(view, "answer") {
+		t.Fatalf("stats line missing from view:\n%s", view)
+	}
+}
+
+func TestFormatSeconds(t *testing.T) {
+	if got := formatSeconds(3.24); got != "3.2s" {
+		t.Fatalf("got %q", got)
+	}
+	if got := formatSeconds(65); got != "1m5s" {
+		t.Fatalf("got %q", got)
+	}
+	if got := formatReplyMeta(replyMeta{seconds: 2, tools: []string{"a", "b"}}); !strings.Contains(got, "a, b") {
+		t.Fatalf("got %q", got)
 	}
 }

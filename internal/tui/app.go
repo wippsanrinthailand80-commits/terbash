@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -53,6 +54,39 @@ type App struct {
 	confirmPrompt string
 	// Terminal size for the bottom status bar (from WindowSizeMsg).
 	termWidth int
+	// Per-reply stats, keyed by message index. Display-only: never sent
+	// back to the model.
+	msgMeta  map[int]replyMeta
+	msgStart time.Time
+}
+
+// replyMeta describes one assistant reply: how long it took and what kind
+// of reply it was (plain answer vs which tools it called).
+type replyMeta struct {
+	seconds float64
+	tools   []string
+}
+
+// formatReplyMeta renders e.g. "⏱ 3.2s • 🔧 grep_search, file_operations"
+// or "⏱ 1.1s • 💬 answer" for tool-free replies.
+func formatReplyMeta(m replyMeta) string {
+	when := formatSeconds(m.seconds)
+	if len(m.tools) == 0 {
+		return fmt.Sprintf("⏱ %s • 💬 answer", when)
+	}
+	return fmt.Sprintf("⏱ %s • 🔧 %s", when, strings.Join(m.tools, ", "))
+}
+
+func formatSeconds(s float64) string {
+	if s < 0 {
+		s = 0
+	}
+	if s < 60 {
+		return fmt.Sprintf("%.1fs", s)
+	}
+	m := int(s) / 60
+	sec := int(s) % 60
+	return fmt.Sprintf("%dm%ds", m, sec)
 }
 
 // toolFrag accumulates one streamed tool call. Providers send arguments
@@ -574,6 +608,7 @@ func (a *App) processInput() tea.Cmd {
 	a.messages = append(a.messages, types.Message{Role: "user", Content: userInput})
 	a.streaming = true
 	a.streamBuf.Reset()
+	a.msgStart = time.Now()
 	a.toolIter = 1
 	a.pendingCalls = nil
 	a.fragTools = nil
@@ -634,6 +669,7 @@ func (a *App) handleCommand(input string) tea.Cmd {
 		a.addSystemMessage(fmt.Sprintf("Available tools: %s", strings.Join(toolNames, ", ")))
 	case "/clear":
 		a.messages = []types.Message{}
+		a.msgMeta = nil
 	case "/config":
 		a.addSystemMessage(fmt.Sprintf("Active provider: %s, providers: %d, tools: %d", a.llmManager.DefaultProviderName(), len(a.llmManager.ListProviders()), len(a.toolReg.List())))
 	case "/status":
@@ -883,6 +919,18 @@ func (a *App) finishStream() (tea.Model, tea.Cmd) {
 	a.fragTools = nil
 	content := a.streamBuf.String()
 	if content != "" || len(calls) > 0 {
+		if a.msgMeta == nil {
+			a.msgMeta = make(map[int]replyMeta)
+		}
+		var names []string
+		for _, c := range calls {
+			names = append(names, c.Function.Name)
+		}
+		a.msgMeta[len(a.messages)] = replyMeta{
+			seconds: time.Since(a.msgStart).Seconds(),
+			tools:   names,
+		}
+		a.msgStart = time.Now()
 		a.messages = append(a.messages, types.Message{
 			Role:      "assistant",
 			Content:   content,
@@ -1003,7 +1051,7 @@ func (a *App) View() string {
 
 	var b strings.Builder
 
-	for _, msg := range a.messages {
+		for i, msg := range a.messages {
 		switch msg.Role {
 		case "user":
 			b.WriteString(a.styles.UserMsg.Render("▌ You"))
@@ -1019,6 +1067,10 @@ func (a *App) View() string {
 			}
 			for _, tc := range msg.ToolCalls {
 				b.WriteString(a.styles.ToolMsg.Render(fmt.Sprintf("  🔧 %s(%s)", tc.Function.Name, tc.Function.Arguments)))
+			}
+			if meta, ok := a.msgMeta[i]; ok {
+				b.WriteString(a.styles.Help.Render(formatReplyMeta(meta)))
+				b.WriteString("\n")
 			}
 		case "system":
 			b.WriteString(a.styles.SystemMsg.Render(msg.Content))

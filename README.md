@@ -251,6 +251,13 @@ In chat the agent runs a real loop: streamed reply → tool calls execute
 on a `🔧 … [y/N]` overlay (`y` once, `n`/Enter/Esc denies); denials are
 told to the model so it adapts.
 
+Every assistant reply carries a stats line with its time and kind:
+
+- `⏱ 1.1s • 💬 answer` — plain text reply, no tools
+- `⏱ 4.2s • 🔧 grep_search, file_operations` — reply that called tools
+
+The stats are display-only metadata; the model never sees them.
+
 All file tools are sandboxed to the working directory (no `../` escapes),
 HTTP is limited to `http(s)` with a 1 MB response cap, and `process`
 only runs on Linux.
