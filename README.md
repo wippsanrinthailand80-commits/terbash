@@ -218,10 +218,26 @@ then just set its API key (`GROQ_API_KEY`, …) or add `api_key` to the config:
 The switch applies instantly to the rest of your chat session.
 
 ### Tool Calling
-The agent can use tools automatically. You'll be prompted for confirmation before:
-- Writing/deleting files
-- Executing shell commands
-- Running Godot exports
+The agent can use tools automatically (`/tools` in chat lists them).
+You'll be prompted for confirmation before anything destructive:
+
+| Tool | What it does | Confirmation |
+|------|--------------|--------------|
+| `file_operations` | read/write/list/delete files | write, delete |
+| `shell_exec` | run shell commands (dangerous patterns blocked) | always |
+| `godot_headless` | headless scripts, tests, Android exports | — |
+| `termux_api` | battery, clipboard, notifications, wifi, sensors | — |
+| `grep_search` | recursive content search (skips `.git`, binaries) | never (read-only) |
+| `glob_files` | file listing by glob (`**` supported) | never (read-only) |
+| `http_fetch` | fetch URLs (GET/POST/…) | POST/PUT/PATCH/DELETE |
+| `git_ops` | status/diff/log/branch/show | add, commit, push |
+| `todo_write` | session task list | never |
+| `process` | list processes, kill by PID (Linux) | kill |
+| `env_vars` | read env vars (secrets redacted unless `reveal=true`) | never |
+
+All file tools are sandboxed to the working directory (no `../` escapes),
+HTTP is limited to `http(s)` with a 1 MB response cap, and `process`
+only runs on Linux.
 
 ### Godot Integration
 ```bash

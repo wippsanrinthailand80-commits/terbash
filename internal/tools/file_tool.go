@@ -56,7 +56,7 @@ func (t *FileTool) Execute(args map[string]interface{}) (*types.ToolResult, erro
 		return &types.ToolResult{Success: false, Error: "path is required"}, nil
 	}
 
-	absPath, err := t.resolvePath(path)
+	absPath, err := resolveSandbox(t.cwd, path)
 	if err != nil {
 		return &types.ToolResult{Success: false, Error: err.Error()}, nil
 	}
@@ -74,27 +74,6 @@ func (t *FileTool) Execute(args map[string]interface{}) (*types.ToolResult, erro
 	default:
 		return &types.ToolResult{Success: false, Error: fmt.Sprintf("unknown operation: %s", op)}, nil
 	}
-}
-
-func (t *FileTool) resolvePath(relPath string) (string, error) {
-	if filepath.IsAbs(relPath) {
-		return "", fmt.Errorf("absolute paths not allowed")
-	}
-
-	cleanPath := filepath.Clean(relPath)
-	if strings.HasPrefix(cleanPath, "..") {
-		return "", fmt.Errorf("directory traversal not allowed")
-	}
-
-	absPath := filepath.Join(t.cwd, cleanPath)
-	absCwd, _ := filepath.Abs(t.cwd)
-	absPath, _ = filepath.Abs(absPath)
-
-	if !strings.HasPrefix(absPath, absCwd) {
-		return "", fmt.Errorf("path escapes sandbox")
-	}
-
-	return absPath, nil
 }
 
 func (t *FileTool) readFile(path string) (*types.ToolResult, error) {
@@ -121,12 +100,8 @@ func (t *FileTool) readFile(path string) (*types.ToolResult, error) {
 }
 
 func (t *FileTool) writeFile(path, content string) (*types.ToolResult, error) {
-	if t.config.Tools.ConfirmWrites {
-		relPath, _ := filepath.Rel(t.cwd, path)
-		fmt.Printf("Write to %s? [y/N]: ", relPath)
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
+	if relPath, err := filepath.Rel(t.cwd, path); err == nil {
+		if !confirmAction(t.config.Tools.ConfirmWrites, fmt.Sprintf("Write to %s?", relPath)) {
 			return &types.ToolResult{Success: false, Error: "write cancelled by user"}, nil
 		}
 	}
@@ -174,12 +149,8 @@ func (t *FileTool) listDir(path string) (*types.ToolResult, error) {
 }
 
 func (t *FileTool) deleteFile(path string) (*types.ToolResult, error) {
-	if t.config.Tools.ConfirmWrites {
-		relPath, _ := filepath.Rel(t.cwd, path)
-		fmt.Printf("Delete %s? [y/N]: ", relPath)
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
+	if relPath, err := filepath.Rel(t.cwd, path); err == nil {
+		if !confirmAction(t.config.Tools.ConfirmWrites, fmt.Sprintf("Delete %s?", relPath)) {
 			return &types.ToolResult{Success: false, Error: "delete cancelled by user"}, nil
 		}
 	}

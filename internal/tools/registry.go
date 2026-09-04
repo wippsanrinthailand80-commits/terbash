@@ -21,6 +21,13 @@ func (r *Registry) registerBuiltins(cfg *types.Config, cwd string) {
 	r.tools["shell_exec"] = NewShellTool(cfg, cwd)
 	r.tools["godot_headless"] = NewGodotTool(cfg, cwd)
 	r.tools["termux_api"] = NewTermuxTool()
+	r.tools["grep_search"] = NewSearchTool(cfg, cwd)
+	r.tools["glob_files"] = NewGlobTool(cfg, cwd)
+	r.tools["http_fetch"] = NewHTTPTool(cfg)
+	r.tools["git_ops"] = NewGitTool(cfg, cwd)
+	r.tools["todo_write"] = NewTodoTool()
+	r.tools["process"] = NewProcessTool(cfg)
+	r.tools["env_vars"] = NewEnvTool()
 }
 
 func (r *Registry) Register(name string, tool types.ToolInterface) {
