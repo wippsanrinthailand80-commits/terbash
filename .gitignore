@@ -1,0 +1,6 @@
+terbash-linux-*
+terbash-darwin-*
+terbash-windows-*
+terbash
+*.exe
+/tmp/

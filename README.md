@@ -17,21 +17,22 @@ Ultra-lightweight, native AI agent CLI for ARM64 devices (Android/Termux, macOS 
 
 ### Termux (Android ARM64)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/terbash/terbash/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/wippsanrinthailand80-commits/terbash/main/install.sh | bash
 terbash
 ```
 
 ### Manual Install (Any ARM64)
 ```bash
 # Download latest release for your platform
-curl -fsSL https://github.com/terbash/terbash/releases/latest/download/terbash_linux_arm64 -o terbash
+curl -fsSL https://github.com/wippsanrinthailand80-commits/terbash/releases/latest/download/terbash-linux-arm64 -o terbash
 chmod +x terbash
-sudo mv terbash /usr/local/bin/
+mkdir -p ~/.local/bin && mv terbash ~/.local/bin/
+# or: sudo mv terbash /usr/local/bin/
 ```
 
 ### Build from Source
 ```bash
-git clone https://github.com/terbash/terbash
+git clone https://github.com/wippsanrinthailand80-commits/terbash
 cd terbash
 make build-arm64  # or make build for current platform
 ./terbash

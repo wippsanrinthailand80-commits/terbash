@@ -1,9 +1,10 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-REPO="terbash/terbash"
+REPO="wippsanrinthailand80-commits/terbash"
 BINARY_NAME="terbash"
-INSTALL_DIR="$PREFIX/bin"
+# $PREFIX is set on Termux, fall back to /usr/local/bin elsewhere
+INSTALL_DIR="${PREFIX:-/usr/local}/bin"
 CONFIG_DIR="$HOME/.config/terbash"
 
 ARCH=$(uname -m)
@@ -23,7 +24,11 @@ esac
 
 echo "Detected: $GOOS/$GOARCH"
 
-LATEST_URL="https://github.com/$REPO/releases/latest/download/${BINARY_NAME}_${GOOS}_${GOARCH}"
+ASSET="${BINARY_NAME}-${GOOS}-${GOARCH}"
+if [ "$GOOS" = "windows" ]; then
+  ASSET="${ASSET}.exe"
+fi
+LATEST_URL="https://github.com/$REPO/releases/latest/download/${ASSET}"
 
 echo "Downloading from: $LATEST_URL"
 
@@ -31,9 +36,17 @@ mkdir -p "$INSTALL_DIR"
 mkdir -p "$CONFIG_DIR"
 
 if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$LATEST_URL" -o "$INSTALL_DIR/$BINARY_NAME"
+    if ! curl -fsSL "$LATEST_URL" -o "$INSTALL_DIR/$BINARY_NAME"; then
+        echo "Error: download failed (404?)."
+        echo "The release asset '$ASSET' was not found at $LATEST_URL"
+        echo "Check https://github.com/$REPO/releases for available files."
+        exit 1
+    fi
 elif command -v wget >/dev/null 2>&1; then
-    wget -q "$LATEST_URL" -O "$INSTALL_DIR/$BINARY_NAME"
+    if ! wget -q "$LATEST_URL" -O "$INSTALL_DIR/$BINARY_NAME"; then
+        echo "Error: download failed. Check https://github.com/$REPO/releases"
+        exit 1
+    fi
 else
     echo "Error: curl or wget required"
     exit 1
